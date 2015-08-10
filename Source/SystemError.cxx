@@ -4,7 +4,7 @@
 #include <cassert>
 
 
-SystemError::SystemError(const char *location, int errorNumber, const char *string) noexcept
+SystemError::SystemError(const char *location, int errorNumber, const char *string)
     : errorNumber_(errorNumber), description_(std::string("SystemError: ") + location + ": "
                                               + string + ": "+ std::strerror(errorNumber))
 {

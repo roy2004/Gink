@@ -24,8 +24,8 @@ public:
     explicit GAIError(const char *, int, const char *);
 
 private:
-    const int errorCode_;
-    const std::string description_;
+    int errorCode_;
+    std::string description_;
 };
 
 

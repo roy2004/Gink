@@ -24,8 +24,8 @@ public:
     explicit SystemError(const char *, int, const char *);
 
 private:
-    const int errorNumber_;
-    const std::string description_;
+    int errorNumber_;
+    std::string description_;
 };
 
 
