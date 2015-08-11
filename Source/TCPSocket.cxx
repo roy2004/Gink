@@ -115,7 +115,7 @@ TCPSocket::read(Stream *stream, std::size_t minBufferSize, int timeout)
         }
     } else {
         char *buffer2;
-        ScopeGuard scopeGuard([&buffer2] { delete buffer2; });
+        ScopeGuard scopeGuard([&buffer2] { delete[] buffer2; });
         std::size_t buffer2Size = minBufferSize - buffer1Size;
         buffer2 = new char[buffer2Size];
         scopeGuard.appoint();
