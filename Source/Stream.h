@@ -7,17 +7,18 @@
 
 class Stream final
 {
-    explicit Stream(const Stream &) = delete;
+    Stream(const Stream &) = delete;
     void operator=(const Stream &) = delete;
 
 public:
-    inline explicit Stream();
+    explicit inline Stream();
     inline ~Stream();
 
-    inline const void *getData();
-    inline std::size_t getDataSize();
+    inline const void *getData() const;
+    inline void *getData();
+    inline std::size_t getDataSize() const;
     inline void *getBuffer();
-    inline std::size_t getBufferSize();
+    inline std::size_t getBufferSize() const;
 
     std::size_t read(void *, std::size_t);
     void write(const void *, std::size_t);
@@ -42,6 +43,13 @@ Stream::~Stream()
 
 
 const void *
+Stream::getData() const
+{
+    return base_.data() + rIndex_;
+}
+
+
+void *
 Stream::getData()
 {
     return base_.data() + rIndex_;
@@ -49,7 +57,7 @@ Stream::getData()
 
 
 std::size_t
-Stream::getDataSize()
+Stream::getDataSize() const
 {
     return wIndex_ - rIndex_;
 }
@@ -63,7 +71,7 @@ Stream::getBuffer()
 
 
 std::size_t
-Stream::getBufferSize()
+Stream::getBufferSize() const
 {
     return base_.size() - wIndex_;
 }

@@ -1,6 +1,14 @@
 #include "Stream.h"
 
 #include <cstring>
+#include <climits>
+
+
+namespace {
+
+std::size_t NextPowerOfTwo(std::size_t);
+
+} // namespace
 
 
 std::size_t
@@ -32,7 +40,7 @@ void
 Stream::write(const void *data, std::size_t dataSize)
 {
     if (base_.size() < wIndex_ + dataSize) {
-        base_.resize(wIndex_ + dataSize);
+        base_.resize(NextPowerOfTwo(wIndex_ + dataSize));
     }
 
     if (data != nullptr) {
@@ -47,7 +55,7 @@ void
 Stream::shrinkToFit()
 {
     if (rIndex_ >= 1) {
-        memmove(base_.data(), base_.data() + rIndex_, wIndex_ - rIndex_);
+        std::memmove(base_.data(), base_.data() + rIndex_, wIndex_ - rIndex_);
         wIndex_ -= rIndex_;
         rIndex_ = 0;
     }
@@ -55,3 +63,22 @@ Stream::shrinkToFit()
     base_.erase(base_.begin() + wIndex_, base_.end());
     base_.shrink_to_fit();
 }
+
+
+namespace {
+
+std::size_t
+NextPowerOfTwo(std::size_t number)
+{
+    --number;
+    int k;
+
+    for (k = 1; k < (int)sizeof number * CHAR_BIT; k *= 2u) {
+        number |= number >> k;
+    }
+
+    ++number;
+    return number;
+}
+
+} // namespace

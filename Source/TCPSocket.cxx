@@ -1,50 +1,41 @@
 #include "TCPSocket.h"
 
 #include <netdb.h>
-#include <netinet/in.h>
 #include <sys/uio.h>
 
 #include <cstring>
 #include <cerrno>
+#include <cassert>
+#include <utility>
 
 #include <Pixy/IO.h>
 
+#include "ScopeGuard.h"
 #include "GAIError.h"
 #include "SystemError.h"
-#include "ScopeGuard.h"
 #include "Stream.h"
 
 
 namespace {
 
-int XSocket(int, int, int);
 void XGetAddrInfo(const char *, const char *, const addrinfo *, addrinfo **);
+int XSocket(int, int, int);
 void xsetsockopt(int, int, int, const void *, socklen_t);
 void xbind(int, const sockaddr *, socklen_t);
 void xlisten(int, int);
-int XAccept4(int, sockaddr *, socklen_t *, int, int);
 void XConnect(int, const sockaddr *, socklen_t, int);
-size_t XRead(int, void *, size_t, int);
+int XAccept4(int, sockaddr *, socklen_t *, int, int);
 size_t XReadV(int, const iovec *, int, int);
 size_t XWrite(int, const void *, size_t, int);
+void xshutdown(int, int);
+void xgetsockname(int, sockaddr *, socklen_t *);
+void xgetpeername(int, sockaddr *, socklen_t *);
 
 } // namespace
 
 
-TCPSocket::TCPSocket()
-    : fd_(XSocket(AF_INET, SOCK_STREAM, IPPROTO_TCP))
-{
-}
-
-
-TCPSocket::~TCPSocket()
-{
-    Close(fd_);
-}
-
-
-void
-TCPSocket::listen(const char *hostName, const char *serviceName, int backlog)
+TCPSocket
+TCPSocket::Listen(const char *hostName, const char *serviceName, int backlog)
 {
     addrinfo hints;
     std::memset(&hints, 0, sizeof hints);
@@ -53,38 +44,25 @@ TCPSocket::listen(const char *hostName, const char *serviceName, int backlog)
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
     addrinfo *result;
-    ScopeGuard scopeGuard([&result] { freeaddrinfo(result); });
+    ScopeGuard scopeGuard1([&result] { freeaddrinfo(result); });
     XGetAddrInfo(hostName, serviceName, &hints, &result);
-    scopeGuard.appoint();
+    scopeGuard1.appoint();
+    int fd;
+    ScopeGuard scopeGuard2([&fd] { Close(fd); });
+    fd = XSocket(result->ai_family, result->ai_socktype, result->ai_protocol);
+    scopeGuard2.appoint();
     int reuseAddress = 1;
-    xsetsockopt(fd_, SOL_SOCKET, SO_REUSEADDR, &reuseAddress, sizeof reuseAddress);
-    xbind(fd_, result->ai_addr, result->ai_addrlen);
-    xlisten(fd_, backlog);
+    xsetsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuseAddress, sizeof reuseAddress);
+    xbind(fd, result->ai_addr, result->ai_addrlen);
+    xlisten(fd, backlog);
+    TCPSocket instance(fd);
+    scopeGuard2.dismiss();
+    return std::move(instance);
 }
 
 
-int
-TCPSocket::accept(std::uint32_t *ipAddress, int *portNumber, int timeout)
-{
-    sockaddr_in address;
-    socklen_t addressSize;
-
-    int subFD = XAccept4(fd_, reinterpret_cast<sockaddr *>(&address), &addressSize, 0, timeout);
-
-    if (ipAddress != nullptr) {
-        *ipAddress = *reinterpret_cast<std::uint32_t *>(&address.sin_addr);
-    }
-
-    if (portNumber != nullptr) {
-        *portNumber = ntohs(address.sin_port);
-    }
-
-    return subFD;
-}
-
-
-void
-TCPSocket::connect(const char *hostName, const char *serviceName, int timeout)
+TCPSocket
+TCPSocket::Connect(const char *hostName, const char *serviceName, int timeout)
 {
     addrinfo hints;
     std::memset(&hints, 0, sizeof hints);
@@ -92,49 +70,71 @@ TCPSocket::connect(const char *hostName, const char *serviceName, int timeout)
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
     addrinfo *result;
-    ScopeGuard scopeGuard([&result] { freeaddrinfo(result); });
+    ScopeGuard scopeGuard1([&result] { freeaddrinfo(result); });
     XGetAddrInfo(hostName, serviceName, &hints, &result);
+    scopeGuard1.appoint();
+    int fd;
+    ScopeGuard scopeGuard2([&fd] { Close(fd); });
+    fd = XSocket(result->ai_family, result->ai_socktype, result->ai_protocol);
+    scopeGuard2.appoint();
+    XConnect(fd, result->ai_addr, result->ai_addrlen, timeout);
+    TCPSocket instance(fd);
+    scopeGuard2.dismiss();
+    return std::move(instance);
+}
+
+
+TCPSocket::TCPSocket(int fd)
+    : fd_(fd)
+{
+}
+
+
+TCPSocket::~TCPSocket()
+{
+    if (fd_ >= 0) {
+        Close(fd_);
+    }
+}
+
+
+TCPSocket
+TCPSocket::accept(int timeout) const
+{
+    int subFD;
+    ScopeGuard scopeGuard([&subFD] { Close(subFD); });
+    subFD = XAccept4(fd_, nullptr, nullptr, 0, timeout);
     scopeGuard.appoint();
-    XConnect(fd_, result->ai_addr, result->ai_addrlen, timeout);
+    TCPSocket instance(subFD);
+    scopeGuard.dismiss();
+    return std::move(instance);
 }
 
 
 std::size_t
-TCPSocket::read(Stream *stream, std::size_t minBufferSize, int timeout)
+TCPSocket::read(Stream *stream, int timeout) const
 {
     assert(stream != nullptr);
     void *buffer1 = stream->getBuffer();
     std::size_t buffer1Size = stream->getBufferSize();
-    size_t numberOfBytes;
+    static char buffer2[65536];
 
-    if (buffer1Size >= minBufferSize) {
-        numberOfBytes = XRead(fd_, buffer1, buffer1Size, timeout);
+    iovec vector[2] = {
+        {buffer1, buffer1Size},
+        {buffer2, sizeof buffer2}
+    };
 
-        if (numberOfBytes > 0) {
-            stream->write(nullptr, numberOfBytes);
-        }
+    size_t numberOfBytes = XReadV(fd_, vector, 2, timeout);
+
+    if (numberOfBytes == 0) {
+        return 0;
+    }
+
+    if (numberOfBytes < buffer1Size) {
+        stream->write(nullptr, numberOfBytes);
     } else {
-        char *buffer2;
-        ScopeGuard scopeGuard([&buffer2] { delete buffer2; });
-        std::size_t buffer2Size = minBufferSize - buffer1Size;
-        buffer2 = new char[buffer2Size];
-        scopeGuard.appoint();
-
-        iovec vector[2] = {
-            {buffer1, buffer1Size},
-            {buffer2, buffer2Size}
-        };
-
-        numberOfBytes = XReadV(fd_, vector, 2, timeout);
-
-        if (numberOfBytes > 0) {
-            if (numberOfBytes < buffer1Size) {
-                stream->write(nullptr, numberOfBytes);
-            } else {
-                stream->write(nullptr, buffer1Size);
-                stream->write(buffer2, numberOfBytes - buffer1Size);
-            }
-        }
+        stream->write(nullptr, buffer1Size);
+        stream->write(buffer2, numberOfBytes - buffer1Size);
     }
 
     return numberOfBytes;
@@ -142,7 +142,7 @@ TCPSocket::read(Stream *stream, std::size_t minBufferSize, int timeout)
 
 
 std::size_t
-TCPSocket::write(Stream *stream, int timeout)
+TCPSocket::write(Stream *stream, int timeout) const
 {
     assert(stream != nullptr);
     const void *data = stream->getData();
@@ -155,9 +155,7 @@ TCPSocket::write(Stream *stream, int timeout)
     std::ptrdiff_t i = 0;
 
     do {
-        size_t n = XWrite(fd_, static_cast<const char *>(data) + i, dataSize - i, timeout);
-
-        i += n;
+        i += XWrite(fd_, static_cast<const char *>(data) + i, dataSize - i, timeout);
     } while (i < static_cast<std::ptrdiff_t>(dataSize));
 
     stream->read(nullptr, i);
@@ -165,7 +163,53 @@ TCPSocket::write(Stream *stream, int timeout)
 }
 
 
+void
+TCPSocket::shutdownRead() const
+{
+    xshutdown(fd_, SHUT_RD);
+}
+
+
+void
+TCPSocket::shutdownWrite() const
+{
+    xshutdown(fd_, SHUT_WR);
+}
+
+
+IPEndpoint
+TCPSocket::getLocalEndpoint() const
+{
+    sockaddr_in address;
+    socklen_t addressSize = sizeof address;
+    xgetsockname(fd_, reinterpret_cast<sockaddr *>(&address), &addressSize);
+    return IPEndpoint(address);
+}
+
+
+IPEndpoint
+TCPSocket::getRemoteEndpoint() const
+{
+    sockaddr_in address;
+    socklen_t addressSize = sizeof address;
+    xgetpeername(fd_, reinterpret_cast<sockaddr *>(&address), &addressSize);
+    return IPEndpoint(address);
+}
+
+
 namespace {
+
+void
+XGetAddrInfo(const char *hostName, const char *serviceName, const addrinfo *hints
+             , addrinfo **result)
+{
+    int errorCode = GetAddrInfo(hostName, serviceName, hints, result);
+
+    if (errorCode != 0) {
+        throw GAI_ERROR(errorCode, "`GetAddrInfo()` failed");
+    }
+}
+
 
 int
 XSocket(int domain, int type, int protocol)
@@ -177,18 +221,6 @@ XSocket(int domain, int type, int protocol)
     }
 
     return fd;
-}
-
-
-void
-XGetAddrInfo(const char *hostName, const char *serviceName, const addrinfo *hints
-             , addrinfo **result)
-{
-    int errorCode = GetAddrInfo(hostName, serviceName, hints, result);
-
-    if (errorCode != 0) {
-        throw GAI_ERROR(errorCode, "`GetAddrInfo()` failed");
-    }
 }
 
 
@@ -219,6 +251,15 @@ xlisten(int sockfd, int backlog)
 }
 
 
+void
+XConnect(int fd, const sockaddr *address, socklen_t addressSize, int timeout)
+{
+    if (Connect(fd, address, addressSize, timeout) < 0) {
+        throw SYSTEM_ERROR(errno, "`Connect()` failed");
+    }
+}
+
+
 int
 XAccept4(int fd, sockaddr *address, socklen_t *addressSize, int flags, int timeout)
 {
@@ -229,28 +270,6 @@ XAccept4(int fd, sockaddr *address, socklen_t *addressSize, int flags, int timeo
     }
 
     return subFD;
-}
-
-
-void
-XConnect(int fd, const sockaddr *address, socklen_t addressSize, int timeout)
-{
-    if (Connect(fd, address, addressSize, timeout) < 0) {
-        throw SYSTEM_ERROR(errno, "`Connect()` failed");
-    }
-}
-
-
-size_t
-XRead(int fd, void *buffer, size_t bufferSize, int timeout)
-{
-    ssize_t numberOfBytes = Read(fd, buffer, bufferSize, timeout);
-
-    if (numberOfBytes < 0) {
-        throw SYSTEM_ERROR(errno, "`Read()` failed");
-    }
-
-    return numberOfBytes;
 }
 
 
@@ -277,6 +296,33 @@ XWrite(int fd, const void *data, size_t dataSize, int timeout)
     }
 
     return numberOfBytes;
+}
+
+
+void
+xshutdown(int sockfd, int how)
+{
+    if (shutdown(sockfd, how) < 0) {
+        throw SYSTEM_ERROR(errno, "`shutdown()` failed");
+    }
+}
+
+
+void
+xgetsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
+{
+    if (getsockname(sockfd, addr, addrlen) < 0) {
+        throw SYSTEM_ERROR(errno, "`getsockname()` failed");
+    }
+}
+
+
+void
+xgetpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
+{
+    if (getpeername(sockfd, addr, addrlen) < 0) {
+        throw SYSTEM_ERROR(errno, "`getpeername()` failed");
+    }
 }
 
 } // namespace

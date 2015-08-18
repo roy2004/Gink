@@ -1,9 +1,10 @@
 #pragma once
 
+
 #include <climits>
-#include <cstdint>
 #include <cstddef>
-#include <cassert>
+
+#include "IPEndpoint.h"
 
 
 class Stream;
@@ -11,28 +12,34 @@ class Stream;
 
 class TCPSocket final
 {
-    explicit TCPSocket(const TCPSocket &) = delete;
+    TCPSocket(const TCPSocket &) = delete;
     void operator=(const TCPSocket &) = delete;
 
 public:
-    inline explicit TCPSocket(int);
+    inline TCPSocket(TCPSocket &&);
 
-    explicit TCPSocket();
+    static TCPSocket Listen(const char *, const char *, int = INT_MAX);
+    static TCPSocket Connect(const char *, const char *, int = -1);
+
     ~TCPSocket();
 
-    void listen(const char *, const char *, int = INT_MAX);
-    int accept(std::uint32_t *, int *, int = -1);
-    void connect(const char *, const char *, int = -1);
-    std::size_t read(Stream *, std::size_t = 65536, int = -1);
-    std::size_t write(Stream *, int = -1);
+    TCPSocket accept(int = -1) const;
+    std::size_t read(Stream *, int = -1) const;
+    std::size_t write(Stream *, int = -1) const;
+    void shutdownRead() const;
+    void shutdownWrite() const;
+    IPEndpoint getLocalEndpoint() const;
+    IPEndpoint getRemoteEndpoint() const;
 
 private:
-    const int fd_;
+    explicit TCPSocket(int);
+
+    int fd_;
 };
 
 
-TCPSocket::TCPSocket(int fd)
-    : fd_(fd)
+TCPSocket::TCPSocket(TCPSocket &&other)
+    : fd_(other.fd_)
 {
-    assert(fd >= 0);
+    other.fd_ = -1;
 }

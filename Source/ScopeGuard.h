@@ -7,7 +7,7 @@
 
 class ScopeGuard final
 {
-    explicit ScopeGuard(const ScopeGuard &) = delete;
+    ScopeGuard(const ScopeGuard &) = delete;
     void operator=(const ScopeGuard &) = delete;
 
 public:
