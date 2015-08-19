@@ -99,12 +99,19 @@ TCPSocket::~TCPSocket()
 
 
 TCPSocket
-TCPSocket::accept(int timeout) const
+TCPSocket::accept(IPEndpoint *endpoint, int timeout) const
 {
     int subFD;
     ScopeGuard scopeGuard([&subFD] { Close(subFD); });
-    subFD = XAccept4(fd_, nullptr, nullptr, 0, timeout);
+    sockaddr_in name;
+    socklen_t nameSize = sizeof name;
+    subFD = XAccept4(fd_, reinterpret_cast<sockaddr *>(&name), &nameSize, 0, timeout);
     scopeGuard.appoint();
+
+    if (endpoint != nullptr) {
+        endpoint->set(name);
+    }
+
     TCPSocket instance(subFD);
     scopeGuard.dismiss();
     return std::move(instance);
@@ -180,20 +187,20 @@ TCPSocket::shutdownWrite() const
 IPEndpoint
 TCPSocket::getLocalEndpoint() const
 {
-    sockaddr_in address;
-    socklen_t addressSize = sizeof address;
-    xgetsockname(fd_, reinterpret_cast<sockaddr *>(&address), &addressSize);
-    return IPEndpoint(address);
+    sockaddr_in name;
+    socklen_t nameSize = sizeof name;
+    xgetsockname(fd_, reinterpret_cast<sockaddr *>(&name), &nameSize);
+    return IPEndpoint(name);
 }
 
 
 IPEndpoint
 TCPSocket::getRemoteEndpoint() const
 {
-    sockaddr_in address;
-    socklen_t addressSize = sizeof address;
-    xgetpeername(fd_, reinterpret_cast<sockaddr *>(&address), &addressSize);
-    return IPEndpoint(address);
+    sockaddr_in name;
+    socklen_t nameSize = sizeof name;
+    xgetpeername(fd_, reinterpret_cast<sockaddr *>(&name), &nameSize);
+    return IPEndpoint(name);
 }
 
 
@@ -252,18 +259,18 @@ xlisten(int sockfd, int backlog)
 
 
 void
-XConnect(int fd, const sockaddr *address, socklen_t addressSize, int timeout)
+XConnect(int fd, const sockaddr *name, socklen_t nameSize, int timeout)
 {
-    if (Connect(fd, address, addressSize, timeout) < 0) {
+    if (Connect(fd, name, nameSize, timeout) < 0) {
         throw SYSTEM_ERROR(errno, "`Connect()` failed");
     }
 }
 
 
 int
-XAccept4(int fd, sockaddr *address, socklen_t *addressSize, int flags, int timeout)
+XAccept4(int fd, sockaddr *name, socklen_t *nameSize, int flags, int timeout)
 {
-    int subFD = Accept4(fd, address, addressSize, flags, timeout);
+    int subFD = Accept4(fd, name, nameSize, flags, timeout);
 
     if (subFD < 0) {
         throw SYSTEM_ERROR(errno, "`Accept4()` failed");
@@ -309,7 +316,7 @@ xshutdown(int sockfd, int how)
 
 
 void
-xgetsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
+xgetsockname(int sockfd, sockaddr *addr, socklen_t *addrlen)
 {
     if (getsockname(sockfd, addr, addrlen) < 0) {
         throw SYSTEM_ERROR(errno, "`getsockname()` failed");
@@ -318,7 +325,7 @@ xgetsockname(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
 
 
 void
-xgetpeername(int sockfd, struct sockaddr *addr, socklen_t *addrlen)
+xgetpeername(int sockfd, sockaddr *addr, socklen_t *addrlen)
 {
     if (getpeername(sockfd, addr, addrlen) < 0) {
         throw SYSTEM_ERROR(errno, "`getpeername()` failed");
