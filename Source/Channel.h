@@ -39,7 +39,8 @@ Channel<TYPE>::Channel(int length)
 }
 
 
-template <typename TYPE> TYPE
+template <typename TYPE>
+TYPE
 Channel<TYPE>::getMessage()
 {
     while (messages_.empty()) {
