@@ -8,81 +8,140 @@
 #include <Pixy/Event.h>
 
 
-template <typename TYPE>
+template <typename T>
 class Channel final
 {
     Channel(const Channel &) = delete;
     void operator=(const Channel &) = delete;
 
 public:
-    inline Channel(int length);
+    inline explicit Channel(int length);
+    inline ~Channel();
 
-    inline TYPE getMessage();
-    inline void putMessage(const TYPE &);
-    inline void putMessage(TYPE &&);
+    inline T getMessage();
+
+    template <typename U>
+    inline void putMessage(U &&);
+
+    template <typename... U>
+    inline void newMessage(U &&...);
 
 private:
-    std::queue<TYPE> messages_;
     int length_;
-    Event notEmptyEvent;
-    Event notFullEvent;
+
+    union {
+        T *message_;
+        std::queue<T> messages_;
+    };
+
+    Event notEmptyEvent_;
+    Event notFullEvent_;
 };
 
 
-template <typename TYPE>
-Channel<TYPE>::Channel(int length)
+template <typename T>
+Channel<T>::Channel(int length)
     : length_(length)
 {
-    assert(length >= 0);
-    Event_Initialize(&notEmptyEvent);
-    Event_Initialize(&notFullEvent);
+    if (length_ == 0) {
+        message_ = nullptr;
+    } else {
+        new (&messages_) std::queue<T>;
+    }
+
+    Event_Initialize(&notEmptyEvent_);
+    Event_Initialize(&notFullEvent_);
 }
 
 
-template <typename TYPE>
-TYPE
-Channel<TYPE>::getMessage()
+template <typename T>
+Channel<T>::~Channel()
 {
-    while (messages_.empty()) {
-        Event_WaitFor(&notEmptyEvent);
+    if (length_ != 0) {
+        messages_.~queue();
     }
-
-    TYPE message = std::move(messages_.front());
-    messages_.pop();
-
-    if (length_ >= 1) {
-        Event_Trigger(&notFullEvent);
-    }
-
-    return std::move(message);
 }
 
 
-template <typename TYPE>
-void
-Channel<TYPE>::putMessage(const TYPE &message)
+template <typename T>
+T
+Channel<T>::getMessage()
 {
-    if (length_ >= 1) {
-        while (messages_.size() == length_) {
-            Event_WaitFor(&notFullEvent);
+    if (length_ == 0) {
+        while (message_ == nullptr) {
+            Event_WaitFor(&notEmptyEvent_);
         }
-    }
 
-    messages_.push(message);
-    Event_Trigger(&notEmptyEvent);
+        T message = std::move(*message_);
+        message_ = nullptr;
+        Event_Trigger(&notFullEvent_);
+        return message;
+    } else {
+        while (messages_.empty()) {
+            Event_WaitFor(&notEmptyEvent_);
+        }
+
+        T message = std::move(messages_.front());
+        messages_.pop();
+
+        if (length_ >= 1) {
+            Event_Trigger(&notFullEvent_);
+        }
+
+        return message;
+    }
 }
 
 
-template <typename TYPE>
+template <typename T>
+template <typename U>
 void
-Channel<TYPE>::putMessage(TYPE &&message)
+Channel<T>::putMessage(U &&message)
 {
-    if (length_ >= 1) {
-        while (messages_.size() == length_) {
-            Event_WaitFor(&notFullEvent);
+    if (length_ == 0) {
+        while (message_ != nullptr) {
+            Event_WaitFor(&notFullEvent_);
         }
-    }
 
-    messages_.push(std::move(message));
-    Event_Trigger(&notEmptyEvent);
+        T temp = std::forward<U>(message);
+        message_ = &temp;
+        Event_Trigger(&notEmptyEvent_);
+        Event_WaitFor(&notFullEvent_);
+    } else {
+        if (length_ >= 1) {
+            while (messages_.size() == length_) {
+                Event_WaitFor(&notFullEvent_);
+            }
+        }
+
+        messages_.push(std::forward<U>(message));
+        Event_Trigger(&notEmptyEvent_);
+    }
+}
+
+
+template <typename T>
+template <typename... U>
+void
+Channel<T>::newMessage(U &&...arguments)
+{
+    if (length_ == 0) {
+        while (message_ != nullptr) {
+            Event_WaitFor(&notFullEvent_);
+        }
+
+        T temp(std::forward<U>(arguments)...);
+        message_ = &temp;
+        Event_Trigger(&notEmptyEvent_);
+        Event_WaitFor(&notFullEvent_);
+    } else {
+        if (length_ >= 1) {
+            while (messages_.size() == length_) {
+                Event_WaitFor(&notFullEvent_);
+            }
+        }
+
+        messages_.emplace(std::forward<U>(arguments)...);
+        Event_Trigger(&notEmptyEvent_);
+    }
 }

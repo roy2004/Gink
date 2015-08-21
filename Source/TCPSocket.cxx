@@ -6,7 +6,6 @@
 #include <cstring>
 #include <cerrno>
 #include <cassert>
-#include <utility>
 
 #include <Pixy/IO.h>
 
@@ -57,7 +56,7 @@ TCPSocket::Listen(const char *hostName, const char *serviceName, int backlog)
     xlisten(fd, backlog);
     TCPSocket instance(fd);
     scopeGuard2.dismiss();
-    return std::move(instance);
+    return instance;
 }
 
 
@@ -80,7 +79,7 @@ TCPSocket::Connect(const char *hostName, const char *serviceName, int timeout)
     XConnect(fd, result->ai_addr, result->ai_addrlen, timeout);
     TCPSocket instance(fd);
     scopeGuard2.dismiss();
-    return std::move(instance);
+    return instance;
 }
 
 
@@ -114,7 +113,7 @@ TCPSocket::accept(IPEndpoint *endpoint, int timeout) const
 
     TCPSocket instance(subFD);
     scopeGuard.dismiss();
-    return std::move(instance);
+    return instance;
 }
 
 
