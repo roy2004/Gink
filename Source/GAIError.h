@@ -13,10 +13,12 @@
 
 class GAIError final: public std::exception
 {
+    GAIError(const GAIError &) = delete;
+    void operator=(const GAIError &) = delete;
+
 public:
-    inline GAIError(const GAIError &);
+    inline GAIError(GAIError &&);
     inline ~GAIError() override;
-    inline void operator=(const GAIError &);
 
     inline int getErrorCode() const noexcept;
     inline const char *what() const noexcept override;
@@ -29,27 +31,15 @@ private:
 };
 
 
-GAIError::GAIError(const GAIError &other)
-    : std::exception(other), errorCode_(other.errorCode_), description_(other.description_)
+GAIError::GAIError(GAIError &&other)
+    : std::exception(std::move(other)), errorCode_(other.errorCode_)
+      , description_(std::move(other.description_))
 {
 }
 
 
 GAIError::~GAIError()
 {
-}
-
-
-void
-GAIError::operator=(const GAIError &other)
-{
-    if (&other == this) {
-        return;
-    }
-
-    std::exception::operator=(other);
-    errorCode_ = other.errorCode_;
-    description_ = other.description_;
 }
 
 

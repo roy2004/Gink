@@ -13,10 +13,12 @@
 
 class SystemError final: public std::exception
 {
+    SystemError(const SystemError &) = delete;
+    void operator=(const SystemError &) = delete;
+
 public:
-    inline SystemError(const SystemError &);
+    inline SystemError(SystemError &&);
     inline ~SystemError() override;
-    inline void operator=(const SystemError &);
 
     inline int getErrorNumber() const noexcept;
     inline const char *what() const noexcept override;
@@ -29,27 +31,15 @@ private:
 };
 
 
-SystemError::SystemError(const SystemError &other)
-    : std::exception(other), errorNumber_(other.errorNumber_), description_(other.description_)
+SystemError::SystemError(SystemError &&other)
+    : std::exception(std::move(other)), errorNumber_(other.errorNumber_)
+      , description_(std::move(other.description_))
 {
 }
 
 
 SystemError::~SystemError()
 {
-}
-
-
-void
-SystemError::operator=(const SystemError &other)
-{
-    if (&other == this) {
-        return;
-    }
-
-    std::exception::operator=(other);
-    errorNumber_ = other.errorNumber_;
-    description_ = other.description_;
 }
 
 
