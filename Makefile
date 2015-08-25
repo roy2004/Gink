@@ -5,9 +5,9 @@ OBJECTS = Coroutine.o\
           SystemError.o\
           TCPSocket.o
 CPPFLAGS = -iquote Include -MMD -MT $@ -MF Build/$*.d
-#CPPFLAGS += -DNDEBUG
+CPPFLAGS += -DNDEBUG
 CXXFLAGS = -std=c++11 -Wall -Wextra -Werror
-#CXXFLAGS += -O2
+CXXFLAGS += -O2
 ARFLAGS = rc
 
 all: Build/Library.a

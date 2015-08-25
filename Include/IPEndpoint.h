@@ -10,6 +10,7 @@ namespace Gink {
 
 struct IPEndpoint
 {
+    inline explicit IPEndpoint();
     inline explicit IPEndpoint(const ::sockaddr_in &);
 
     inline void set(const ::sockaddr_in &);
@@ -17,6 +18,12 @@ struct IPEndpoint
     std::uint32_t address;
     std::uint16_t portNumber;
 };
+
+
+IPEndpoint::IPEndpoint()
+    : address(0), portNumber(0)
+{
+}
 
 
 IPEndpoint::IPEndpoint(const ::sockaddr_in &name)
