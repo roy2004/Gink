@@ -14,17 +14,19 @@ FiberMain(int argc, char **argv)
 }
 
 
+namespace Gink {
+
 void
 CoAdd(const Coroutine &coroutine)
 {
-    void (*wrapper)(uintptr_t) = [] (uintptr_t argument) noexcept {
+    void (*wrapper)(::uintptr_t) = [] (::uintptr_t argument) noexcept {
         Coroutine coroutine(*reinterpret_cast<Coroutine *>(argument));
-        YieldCurrentFiber();
+        ::YieldCurrentFiber();
         coroutine();
     };
 
-    if (AddAndRunFiber(wrapper, reinterpret_cast<uintptr_t>(&coroutine)) < 0) {
-        throw SYSTEM_ERROR(errno, "`AddAndRunFiber()` failed");
+    if (!::AddAndRunFiber(wrapper, reinterpret_cast<::uintptr_t>(&coroutine))) {
+        throw GINK_SYSTEM_ERROR(errno, "`::AddAndRunFiber()` failed");
     }
 }
 
@@ -32,14 +34,14 @@ CoAdd(const Coroutine &coroutine)
 void
 CoAdd(Coroutine &&coroutine)
 {
-    void (*wrapper)(uintptr_t) = [] (uintptr_t argument) noexcept {
+    void (*wrapper)(::uintptr_t) = [] (::uintptr_t argument) noexcept {
         Coroutine coroutine(std::move(*reinterpret_cast<Coroutine *>(argument)));
-        YieldCurrentFiber();
+        ::YieldCurrentFiber();
         coroutine();
     };
 
-    if (AddAndRunFiber(wrapper, reinterpret_cast<uintptr_t>(&coroutine)) < 0) {
-        throw SYSTEM_ERROR(errno, "`AddAndRunFiber()` failed");
+    if (!::AddAndRunFiber(wrapper, reinterpret_cast<::uintptr_t>(&coroutine))) {
+        throw GINK_SYSTEM_ERROR(errno, "`::AddAndRunFiber()` failed");
     }
 }
 
@@ -47,13 +49,13 @@ CoAdd(Coroutine &&coroutine)
 void
 CoAddAndRun(const Coroutine &coroutine)
 {
-    void (*wrapper)(uintptr_t) = [] (uintptr_t argument) noexcept {
+    void (*wrapper)(::uintptr_t) = [] (::uintptr_t argument) noexcept {
         Coroutine coroutine(*reinterpret_cast<Coroutine *>(argument));
         coroutine();
     };
 
-    if (AddAndRunFiber(wrapper, reinterpret_cast<uintptr_t>(&coroutine)) < 0) {
-        throw SYSTEM_ERROR(errno, "`AddAndRunFiber()` failed");
+    if (!::AddAndRunFiber(wrapper, reinterpret_cast<::uintptr_t>(&coroutine))) {
+        throw GINK_SYSTEM_ERROR(errno, "`::AddAndRunFiber()` failed");
     }
 }
 
@@ -61,13 +63,13 @@ CoAddAndRun(const Coroutine &coroutine)
 void
 CoAddAndRun(Coroutine &&coroutine)
 {
-    void (*wrapper)(uintptr_t) = [] (uintptr_t argument) noexcept {
+    void (*wrapper)(::uintptr_t) = [] (::uintptr_t argument) noexcept {
         Coroutine coroutine(std::move(*reinterpret_cast<Coroutine *>(argument)));
         coroutine();
     };
 
-    if (AddAndRunFiber(wrapper, reinterpret_cast<uintptr_t>(&coroutine)) < 0) {
-        throw SYSTEM_ERROR(errno, "`AddAndRunFiber()` failed");
+    if (!::AddAndRunFiber(wrapper, reinterpret_cast<::uintptr_t>(&coroutine))) {
+        throw GINK_SYSTEM_ERROR(errno, "`::AddAndRunFiber()` failed");
     }
 }
 
@@ -75,21 +77,23 @@ CoAddAndRun(Coroutine &&coroutine)
 void
 CoYield()
 {
-    YieldCurrentFiber();
+    ::YieldCurrentFiber();
 }
 
 
 void
 CoExit()
 {
-    ExitCurrentFiber();
+    ::ExitCurrentFiber();
 }
 
 
 void
 CoSleep(int duration)
 {
-    if (SleepCurrentFiber(duration) < 0) {
-        throw SYSTEM_ERROR(errno, "`SleepCurrentFiber()` failed");
+    if (!::SleepCurrentFiber(duration)) {
+        throw GINK_SYSTEM_ERROR(errno, "`::SleepCurrentFiber()` failed");
     }
 }
+
+} // namespace Gink

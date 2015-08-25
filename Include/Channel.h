@@ -8,6 +8,8 @@
 #include <Pixy/Event.h>
 
 
+namespace Gink {
+
 template <typename T>
 class Channel final
 {
@@ -145,3 +147,5 @@ Channel<T>::newMessage(U &&...arguments)
         Event_Trigger(&notEmptyEvent_);
     }
 }
+
+} // namespace Gink

@@ -7,6 +7,8 @@
 #include "IPEndpoint.h"
 
 
+namespace Gink {
+
 class Stream;
 
 
@@ -43,3 +45,5 @@ TCPSocket::TCPSocket(TCPSocket &&other)
 {
     other.fd_ = -1;
 }
+
+} // namespace Gink

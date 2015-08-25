@@ -7,9 +7,11 @@
 #include "Utility.h"
 
 
-#define SYSTEM_ERROR(ERROR_NUMBER, STRING) \
-    SystemError(__FILE__ ":" STRINGIZE(__LINE__), ERROR_NUMBER, STRING)
+#define GINK_SYSTEM_ERROR(ERROR_NUMBER, STRING) \
+    Gink::SystemError(__FILE__ ":" GINK_STRINGIZE(__LINE__), ERROR_NUMBER, STRING)
 
+
+namespace Gink {
 
 class SystemError final: public std::exception
 {
@@ -55,3 +57,5 @@ SystemError::what() const noexcept
 {
     return description_.c_str();
 }
+
+} // namespace Gink

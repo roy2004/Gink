@@ -5,6 +5,8 @@
 #include <utility>
 
 
+namespace Gink {
+
 class ScopeGuard final
 {
     ScopeGuard(const ScopeGuard &) = delete;
@@ -56,3 +58,5 @@ ScopeGuard::dismiss() noexcept
 {
     isEngaged_ = false;
 }
+
+} // namespace Gink

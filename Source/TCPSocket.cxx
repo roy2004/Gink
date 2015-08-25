@@ -15,20 +15,22 @@
 #include "Stream.h"
 
 
+namespace Gink {
+
 namespace {
 
-void XGetAddrInfo(const char *, const char *, const addrinfo *, addrinfo **);
+void XGetAddrInfo(const char *, const char *, const ::addrinfo *, ::addrinfo **);
 int XSocket(int, int, int);
-void xsetsockopt(int, int, int, const void *, socklen_t);
-void xbind(int, const sockaddr *, socklen_t);
+void xsetsockopt(int, int, int, const void *, ::socklen_t);
+void xbind(int, const ::sockaddr *, ::socklen_t);
 void xlisten(int, int);
-void XConnect(int, const sockaddr *, socklen_t, int);
-int XAccept4(int, sockaddr *, socklen_t *, int, int);
-size_t XReadV(int, const iovec *, int, int);
-size_t XWrite(int, const void *, size_t, int);
+void XConnect(int, const ::sockaddr *, ::socklen_t, int);
+int XAccept4(int, ::sockaddr *, ::socklen_t *, int, int);
+::size_t XReadV(int, const ::iovec *, int, int);
+::size_t XWrite(int, const void *, ::size_t, int);
 void xshutdown(int, int);
-void xgetsockname(int, sockaddr *, socklen_t *);
-void xgetpeername(int, sockaddr *, socklen_t *);
+void xgetsockname(int, ::sockaddr *, ::socklen_t *);
+void xgetpeername(int, ::sockaddr *, ::socklen_t *);
 
 } // namespace
 
@@ -36,18 +38,18 @@ void xgetpeername(int, sockaddr *, socklen_t *);
 TCPSocket
 TCPSocket::Listen(const char *hostName, const char *serviceName, int backlog)
 {
-    addrinfo hints;
+    ::addrinfo hints;
     std::memset(&hints, 0, sizeof hints);
     hints.ai_flags = AI_PASSIVE;
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
-    addrinfo *result;
-    ScopeGuard scopeGuard1([&result] { freeaddrinfo(result); });
+    ::addrinfo *result;
+    ScopeGuard scopeGuard1([&result] { ::freeaddrinfo(result); });
     XGetAddrInfo(hostName, serviceName, &hints, &result);
     scopeGuard1.appoint();
     int fd;
-    ScopeGuard scopeGuard2([&fd] { Close(fd); });
+    ScopeGuard scopeGuard2([&fd] { ::Close(fd); });
     fd = XSocket(result->ai_family, result->ai_socktype, result->ai_protocol);
     scopeGuard2.appoint();
     int reuseAddress = 1;
@@ -63,17 +65,17 @@ TCPSocket::Listen(const char *hostName, const char *serviceName, int backlog)
 TCPSocket
 TCPSocket::Connect(const char *hostName, const char *serviceName, int timeout)
 {
-    addrinfo hints;
+    ::addrinfo hints;
     std::memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_protocol = IPPROTO_TCP;
-    addrinfo *result;
-    ScopeGuard scopeGuard1([&result] { freeaddrinfo(result); });
+    ::addrinfo *result;
+    ScopeGuard scopeGuard1([&result] { ::freeaddrinfo(result); });
     XGetAddrInfo(hostName, serviceName, &hints, &result);
     scopeGuard1.appoint();
     int fd;
-    ScopeGuard scopeGuard2([&fd] { Close(fd); });
+    ScopeGuard scopeGuard2([&fd] { ::Close(fd); });
     fd = XSocket(result->ai_family, result->ai_socktype, result->ai_protocol);
     scopeGuard2.appoint();
     XConnect(fd, result->ai_addr, result->ai_addrlen, timeout);
@@ -92,7 +94,7 @@ TCPSocket::TCPSocket(int fd)
 TCPSocket::~TCPSocket()
 {
     if (fd_ >= 0) {
-        Close(fd_);
+        ::Close(fd_);
     }
 }
 
@@ -101,10 +103,10 @@ TCPSocket
 TCPSocket::accept(IPEndpoint *endpoint, int timeout) const
 {
     int subFD;
-    ScopeGuard scopeGuard([&subFD] { Close(subFD); });
-    sockaddr_in name;
-    socklen_t nameSize = sizeof name;
-    subFD = XAccept4(fd_, reinterpret_cast<sockaddr *>(&name), &nameSize, 0, timeout);
+    ScopeGuard scopeGuard([&subFD] { ::Close(subFD); });
+    ::sockaddr_in name;
+    ::socklen_t nameSize = sizeof name;
+    subFD = XAccept4(fd_, reinterpret_cast<::sockaddr *>(&name), &nameSize, 0, timeout);
     scopeGuard.appoint();
 
     if (endpoint != nullptr) {
@@ -125,12 +127,12 @@ TCPSocket::read(Stream *stream, int timeout) const
     std::size_t buffer1Size = stream->getBufferSize();
     static char buffer2[65536];
 
-    iovec vector[2] = {
+    ::iovec vector[2] = {
         {buffer1, buffer1Size},
         {buffer2, sizeof buffer2}
     };
 
-    size_t numberOfBytes = XReadV(fd_, vector, 2, timeout);
+    ::size_t numberOfBytes = XReadV(fd_, vector, 2, timeout);
 
     if (numberOfBytes == 0) {
         return 0;
@@ -186,9 +188,9 @@ TCPSocket::shutdownWrite() const
 IPEndpoint
 TCPSocket::getLocalEndpoint() const
 {
-    sockaddr_in name;
-    socklen_t nameSize = sizeof name;
-    xgetsockname(fd_, reinterpret_cast<sockaddr *>(&name), &nameSize);
+    ::sockaddr_in name;
+    ::socklen_t nameSize = sizeof name;
+    xgetsockname(fd_, reinterpret_cast<::sockaddr *>(&name), &nameSize);
     return IPEndpoint(name);
 }
 
@@ -196,9 +198,9 @@ TCPSocket::getLocalEndpoint() const
 IPEndpoint
 TCPSocket::getRemoteEndpoint() const
 {
-    sockaddr_in name;
-    socklen_t nameSize = sizeof name;
-    xgetpeername(fd_, reinterpret_cast<sockaddr *>(&name), &nameSize);
+    ::sockaddr_in name;
+    ::socklen_t nameSize = sizeof name;
+    xgetpeername(fd_, reinterpret_cast<::sockaddr *>(&name), &nameSize);
     return IPEndpoint(name);
 }
 
@@ -206,13 +208,13 @@ TCPSocket::getRemoteEndpoint() const
 namespace {
 
 void
-XGetAddrInfo(const char *hostName, const char *serviceName, const addrinfo *hints
-             , addrinfo **result)
+XGetAddrInfo(const char *hostName, const char *serviceName, const ::addrinfo *hints
+             , ::addrinfo **result)
 {
-    int errorCode = GetAddrInfo(hostName, serviceName, hints, result);
+    int errorCode = ::GetAddrInfo(hostName, serviceName, hints, result);
 
     if (errorCode != 0) {
-        throw GAI_ERROR(errorCode, "`GetAddrInfo()` failed");
+        throw GINK_GAI_ERROR(errorCode, "`::GetAddrInfo()` failed");
     }
 }
 
@@ -220,10 +222,10 @@ XGetAddrInfo(const char *hostName, const char *serviceName, const addrinfo *hint
 int
 XSocket(int domain, int type, int protocol)
 {
-    int fd = Socket(domain, type, protocol);
+    int fd = ::Socket(domain, type, protocol);
 
     if (fd < 0) {
-        throw SYSTEM_ERROR(errno, "`Socket()` failed");
+        throw GINK_SYSTEM_ERROR(errno, "`::Socket()` failed");
     }
 
     return fd;
@@ -231,19 +233,19 @@ XSocket(int domain, int type, int protocol)
 
 
 void
-xsetsockopt(int sockfd, int level, int optname, const void *optval, socklen_t optlen)
+xsetsockopt(int sockfd, int level, int optname, const void *optval, ::socklen_t optlen)
 {
-    if (setsockopt(sockfd, level, optname, optval, optlen) < 0) {
-        throw SYSTEM_ERROR(errno, "`xsetsockopt()` failed");
+    if (::setsockopt(sockfd, level, optname, optval, optlen) < 0) {
+        throw GINK_SYSTEM_ERROR(errno, "`::setsockopt()` failed");
     }
 }
 
 
 void
-xbind(int sockfd, const sockaddr *addr, socklen_t addrlen)
+xbind(int sockfd, const ::sockaddr *addr, ::socklen_t addrlen)
 {
-    if (bind(sockfd, addr, addrlen) < 0) {
-        throw SYSTEM_ERROR(errno, "`bind()` failed");
+    if (::bind(sockfd, addr, addrlen) < 0) {
+        throw GINK_SYSTEM_ERROR(errno, "`::bind()` failed");
     }
 }
 
@@ -251,54 +253,54 @@ xbind(int sockfd, const sockaddr *addr, socklen_t addrlen)
 void
 xlisten(int sockfd, int backlog)
 {
-    if (listen(sockfd, backlog) < 0) {
-        throw SYSTEM_ERROR(errno, "`listen()` failed");
+    if (::listen(sockfd, backlog) < 0) {
+        throw GINK_SYSTEM_ERROR(errno, "`::listen()` failed");
     }
 }
 
 
 void
-XConnect(int fd, const sockaddr *name, socklen_t nameSize, int timeout)
+XConnect(int fd, const ::sockaddr *name, ::socklen_t nameSize, int timeout)
 {
-    if (Connect(fd, name, nameSize, timeout) < 0) {
-        throw SYSTEM_ERROR(errno, "`Connect()` failed");
+    if (::Connect(fd, name, nameSize, timeout) < 0) {
+        throw GINK_SYSTEM_ERROR(errno, "`::Connect()` failed");
     }
 }
 
 
 int
-XAccept4(int fd, sockaddr *name, socklen_t *nameSize, int flags, int timeout)
+XAccept4(int fd, ::sockaddr *name, ::socklen_t *nameSize, int flags, int timeout)
 {
-    int subFD = Accept4(fd, name, nameSize, flags, timeout);
+    int subFD = ::Accept4(fd, name, nameSize, flags, timeout);
 
     if (subFD < 0) {
-        throw SYSTEM_ERROR(errno, "`Accept4()` failed");
+        throw GINK_SYSTEM_ERROR(errno, "`::Accept4()` failed");
     }
 
     return subFD;
 }
 
 
-size_t
-XReadV(int fd, const iovec *vector, int vectorLength, int timeout)
+::size_t
+XReadV(int fd, const ::iovec *vector, int vectorLength, int timeout)
 {
-    ssize_t numberOfBytes = ReadV(fd, vector, vectorLength, timeout);
+    ::ssize_t numberOfBytes = ::ReadV(fd, vector, vectorLength, timeout);
 
     if (numberOfBytes < 0) {
-        throw SYSTEM_ERROR(errno, "`ReadV()` failed");
+        throw GINK_SYSTEM_ERROR(errno, "`::ReadV()` failed");
     }
 
     return numberOfBytes;
 }
 
 
-size_t
-XWrite(int fd, const void *data, size_t dataSize, int timeout)
+::size_t
+XWrite(int fd, const void *data, ::size_t dataSize, int timeout)
 {
-    ssize_t numberOfBytes = Write(fd, data, dataSize, timeout);
+    ::ssize_t numberOfBytes = ::Write(fd, data, dataSize, timeout);
 
     if (numberOfBytes < 0) {
-        throw SYSTEM_ERROR(errno, "`Write()` failed");
+        throw GINK_SYSTEM_ERROR(errno, "`::Write()` failed");
     }
 
     return numberOfBytes;
@@ -308,27 +310,29 @@ XWrite(int fd, const void *data, size_t dataSize, int timeout)
 void
 xshutdown(int sockfd, int how)
 {
-    if (shutdown(sockfd, how) < 0) {
-        throw SYSTEM_ERROR(errno, "`shutdown()` failed");
+    if (::shutdown(sockfd, how) < 0) {
+        throw GINK_SYSTEM_ERROR(errno, "`::shutdown()` failed");
     }
 }
 
 
 void
-xgetsockname(int sockfd, sockaddr *addr, socklen_t *addrlen)
+xgetsockname(int sockfd, ::sockaddr *addr, ::socklen_t *addrlen)
 {
-    if (getsockname(sockfd, addr, addrlen) < 0) {
-        throw SYSTEM_ERROR(errno, "`getsockname()` failed");
+    if (::getsockname(sockfd, addr, addrlen) < 0) {
+        throw GINK_SYSTEM_ERROR(errno, "`::getsockname()` failed");
     }
 }
 
 
 void
-xgetpeername(int sockfd, sockaddr *addr, socklen_t *addrlen)
+xgetpeername(int sockfd, ::sockaddr *addr, ::socklen_t *addrlen)
 {
-    if (getpeername(sockfd, addr, addrlen) < 0) {
-        throw SYSTEM_ERROR(errno, "`getpeername()` failed");
+    if (::getpeername(sockfd, addr, addrlen) < 0) {
+        throw GINK_SYSTEM_ERROR(errno, "`::getpeername()` failed");
     }
 }
 
 } // namespace
+
+} // namespace Gink

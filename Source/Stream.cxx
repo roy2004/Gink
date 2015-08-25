@@ -4,6 +4,8 @@
 #include <climits>
 
 
+namespace Gink {
+
 namespace {
 
 std::size_t NextPowerOfTwo(std::size_t);
@@ -82,3 +84,5 @@ NextPowerOfTwo(std::size_t number)
 }
 
 } // namespace
+
+} // namespace Gink

@@ -7,9 +7,11 @@
 #include "Utility.h"
 
 
-#define GAI_ERROR(ERROR_CODE, STRING) \
-    GAIError(__FILE__ ":" STRINGIZE(__LINE__), ERROR_CODE, STRING)
+#define GINK_GAI_ERROR(ERROR_CODE, STRING) \
+    Gink::GAIError(__FILE__ ":" GINK_STRINGIZE(__LINE__), ERROR_CODE, STRING)
 
+
+namespace Gink {
 
 class GAIError final: public std::exception
 {
@@ -55,3 +57,5 @@ GAIError::what() const noexcept
 {
     return description_.c_str();
 }
+
+} // namespace Gink

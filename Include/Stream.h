@@ -5,6 +5,8 @@
 #include <vector>
 
 
+namespace Gink {
+
 class Stream final
 {
     Stream(const Stream &) = delete;
@@ -75,3 +77,5 @@ Stream::getBufferSize() const
 {
     return base_.size() - wIndex_;
 }
+
+} // namespace Gink
