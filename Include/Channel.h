@@ -21,6 +21,7 @@ public:
     inline ~Channel();
 
     inline T getMessage();
+    inline T &peekMessage();
 
     template <typename U>
     inline void putMessage(U &&);
@@ -36,8 +37,8 @@ private:
         std::queue<T> messages_;
     };
 
-    Event notEmptyEvent_;
-    Event notFullEvent_;
+    ::Event notEmptyEvent_;
+    ::Event notFullEvent_;
 };
 
 
@@ -51,8 +52,8 @@ Channel<T>::Channel(int length)
         new (&messages_) std::queue<T>;
     }
 
-    Event_Initialize(&notEmptyEvent_);
-    Event_Initialize(&notFullEvent_);
+    ::Event_Initialize(&notEmptyEvent_);
+    ::Event_Initialize(&notFullEvent_);
 }
 
 
@@ -71,25 +72,47 @@ Channel<T>::getMessage()
 {
     if (length_ == 0) {
         while (message_ == nullptr) {
-            Event_WaitFor(&notEmptyEvent_);
+            ::Event_WaitFor(&notEmptyEvent_);
         }
 
         T message = std::move(*message_);
         message_ = nullptr;
-        Event_Trigger(&notFullEvent_);
+        ::Event_Trigger(&notFullEvent_);
         return message;
     } else {
         while (messages_.empty()) {
-            Event_WaitFor(&notEmptyEvent_);
+            ::Event_WaitFor(&notEmptyEvent_);
         }
 
         T message = std::move(messages_.front());
         messages_.pop();
 
         if (length_ >= 1) {
-            Event_Trigger(&notFullEvent_);
+            ::Event_Trigger(&notFullEvent_);
         }
 
+        return message;
+    }
+}
+
+
+template <typename T>
+T &
+Channel<T>::peekMessage()
+{
+    if (length_ == 0) {
+        while (message_ == nullptr) {
+            ::Event_WaitFor(&notEmptyEvent_);
+        }
+
+        T &message = *message_;
+        return message;
+    } else {
+        while (messages_.empty()) {
+            ::Event_WaitFor(&notEmptyEvent_);
+        }
+
+        T &message = messages_.front();
         return message;
     }
 }
@@ -102,22 +125,22 @@ Channel<T>::putMessage(U &&message)
 {
     if (length_ == 0) {
         while (message_ != nullptr) {
-            Event_WaitFor(&notFullEvent_);
+            ::Event_WaitFor(&notFullEvent_);
         }
 
         T temp = std::forward<U>(message);
         message_ = &temp;
-        Event_Trigger(&notEmptyEvent_);
-        Event_WaitFor(&notFullEvent_);
+        ::Event_Trigger(&notEmptyEvent_);
+        ::Event_WaitFor(&notFullEvent_);
     } else {
         if (length_ >= 1) {
             while (messages_.size() == length_) {
-                Event_WaitFor(&notFullEvent_);
+                ::Event_WaitFor(&notFullEvent_);
             }
         }
 
         messages_.push(std::forward<U>(message));
-        Event_Trigger(&notEmptyEvent_);
+        ::Event_Trigger(&notEmptyEvent_);
     }
 }
 
@@ -129,22 +152,22 @@ Channel<T>::newMessage(U &&...arguments)
 {
     if (length_ == 0) {
         while (message_ != nullptr) {
-            Event_WaitFor(&notFullEvent_);
+            ::Event_WaitFor(&notFullEvent_);
         }
 
         T temp(std::forward<U>(arguments)...);
         message_ = &temp;
-        Event_Trigger(&notEmptyEvent_);
-        Event_WaitFor(&notFullEvent_);
+        ::Event_Trigger(&notEmptyEvent_);
+        ::Event_WaitFor(&notFullEvent_);
     } else {
         if (length_ >= 1) {
             while (messages_.size() == length_) {
-                Event_WaitFor(&notFullEvent_);
+                ::Event_WaitFor(&notFullEvent_);
             }
         }
 
         messages_.emplace(std::forward<U>(arguments)...);
-        Event_Trigger(&notEmptyEvent_);
+        ::Event_Trigger(&notEmptyEvent_);
     }
 }
 
