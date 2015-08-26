@@ -6,11 +6,11 @@
 
 namespace Gink {
 
-SystemError::SystemError(const char *location, int errorNumber, const char *string)
-    : errorNumber_(errorNumber), description_(std::string("SystemError: ") + location + ": "
-                                              + string + ": "+ std::strerror(errorNumber))
+SystemError::SystemError(int errorNumber, const char *description)
+    : errorNumber_(errorNumber), description_(description)
 {
     assert(errorNumber != 0);
+    description_ += std::strerror(errorNumber_);
 }
 
 } // namespace Gink

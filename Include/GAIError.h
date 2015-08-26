@@ -7,8 +7,8 @@
 #include "Utility.h"
 
 
-#define GINK_GAI_ERROR(ERROR_CODE, STRING) \
-    Gink::GAIError(__FILE__ ":" GINK_STRINGIZE(__LINE__), ERROR_CODE, STRING)
+#define GINK_GAI_ERROR(errorCode, string) \
+    Gink::GAIError(errorCode, __FILE__ ":" GINK_STRINGIZE(__LINE__) ": " string)
 
 
 namespace Gink {
@@ -25,7 +25,7 @@ public:
     inline int getErrorCode() const noexcept;
     inline const char *what() const noexcept override;
 
-    explicit GAIError(const char *, int, const char *);
+    explicit GAIError(int, const char *);
 
 private:
     int errorCode_;

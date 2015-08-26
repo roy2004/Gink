@@ -7,11 +7,11 @@
 
 namespace Gink {
 
-GAIError::GAIError(const char *location, int errorCode, const char *string)
-    : errorCode_(errorCode), description_(std::string("GAIError: ") + location + ": " + string
-                                          + ": " + ::gai_strerror(errorCode))
+GAIError::GAIError(int errorCode, const char *description)
+    : errorCode_(errorCode), description_(description)
 {
     assert(errorCode != 0);
+    description_ += ::gai_strerror(errorCode_);
 }
 
 } // namespace Gink

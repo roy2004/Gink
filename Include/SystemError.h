@@ -7,8 +7,8 @@
 #include "Utility.h"
 
 
-#define GINK_SYSTEM_ERROR(ERROR_NUMBER, STRING) \
-    Gink::SystemError(__FILE__ ":" GINK_STRINGIZE(__LINE__), ERROR_NUMBER, STRING)
+#define GINK_SYSTEM_ERROR(errorNumber, string) \
+    Gink::SystemError(errorNumber, __FILE__ ":" GINK_STRINGIZE(__LINE__) ": " string)
 
 
 namespace Gink {
@@ -25,7 +25,7 @@ public:
     inline int getErrorNumber() const noexcept;
     inline const char *what() const noexcept override;
 
-    explicit SystemError(const char *, int, const char *);
+    explicit SystemError(int, const char *);
 
 private:
     int errorNumber_;
