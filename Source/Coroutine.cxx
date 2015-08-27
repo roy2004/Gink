@@ -8,7 +8,7 @@
 
 
 int
-FiberMain(int argc, char **argv)
+FiberMain(int argc, char **argv) noexcept
 {
     return CoMain(argc, argv);
 }
