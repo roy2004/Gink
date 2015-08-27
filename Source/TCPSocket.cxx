@@ -1,6 +1,7 @@
 #include "TCPSocket.h"
 
 #include <netdb.h>
+#include <netinet/tcp.h>
 #include <sys/uio.h>
 
 #include <cstring>
@@ -52,8 +53,9 @@ TCPSocket::Listen(const char *hostName, const char *serviceName, int backlog)
     ScopeGuard scopeGuard2([&fd] { ::Close(fd); });
     fd = XSocket(result->ai_family, result->ai_socktype, result->ai_protocol);
     scopeGuard2.appoint();
-    int reuseAddress = 1;
-    xsetsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &reuseAddress, sizeof reuseAddress);
+    int onOff = 1;
+    xsetsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &onOff, sizeof onOff);
+    xsetsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &onOff, sizeof onOff);
     xbind(fd, result->ai_addr, result->ai_addrlen);
     xlisten(fd, backlog);
     TCPSocket instance(fd);
