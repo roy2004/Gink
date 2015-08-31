@@ -11,6 +11,7 @@ GAIError::GAIError(int errorCode, const char *description)
     : errorCode_(errorCode), description_(description)
 {
     assert(errorCode != 0);
+    description_ += ": ";
     description_ += ::gai_strerror(errorCode_);
 }
 

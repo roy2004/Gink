@@ -10,6 +10,7 @@ SystemError::SystemError(int errorNumber, const char *description)
     : errorNumber_(errorNumber), description_(description)
 {
     assert(errorNumber != 0);
+    description_ += ": ";
     description_ += std::strerror(errorNumber_);
 }
 
