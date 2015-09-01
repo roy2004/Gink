@@ -1,6 +1,7 @@
 PREFIX = /usr/local/
 OBJECTS = Coroutine.o\
           GAIError.o\
+          Semaphore.o\
           Stream.o\
           SystemError.o\
           TCPSocket.o
