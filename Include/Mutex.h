@@ -1,7 +1,9 @@
 #pragma once
 
 
-#include "Semaphore.h"
+#include <cassert>
+
+#include <Pixy/Semaphore.h>
 
 
 namespace Gink {
@@ -18,27 +20,28 @@ public:
     inline void unlock();
 
 private:
-    Semaphore semaphore_;
+    ::Semaphore semaphore_;
 };
 
 
 Mutex::Mutex()
-    : semaphore_(1, 0, 1)
 {
+    bool ok = ::Semaphore_Initialize(&semaphore_, 1, 0, 1);
+    assert(ok);
 }
 
 
 void
 Mutex::lock()
 {
-    semaphore_.down();
+    ::Semaphore_Down(&semaphore_);
 }
 
 
 void
 Mutex::unlock()
 {
-    semaphore_.up();
+    ::Semaphore_Up(&semaphore_);
 }
 
 

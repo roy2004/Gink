@@ -1,10 +1,12 @@
 #pragma once
 
 
+#include <climits>
+#include <cassert>
 #include <queue>
 #include <utility>
 
-#include <Pixy/Event.h>
+#include <Pixy/Semaphore.h>
 
 
 namespace Gink {
@@ -16,10 +18,10 @@ class Channel final
     void operator=(const Channel &) = delete;
 
 public:
-    inline explicit Channel(int length);
+    inline explicit Channel(int);
 
     inline T getMessage();
-    inline T &peekMessage();
+    inline T peekMessage();
 
     template <typename U>
     inline void putMessage(U &&);
@@ -28,19 +30,16 @@ public:
     inline void newMessage(U &&...);
 
 private:
-    int length_;
+    ::Semaphore semaphore_;
     std::queue<T> messages_;
-    ::Event notEmptyEvent_;
-    ::Event notFullEvent_;
 };
 
 
 template <typename T>
 Channel<T>::Channel(int length)
-    : length_(length)
 {
-    ::Event_Initialize(&notEmptyEvent_);
-    ::Event_Initialize(&notFullEvent_);
+    bool ok = ::Semaphore_Initialize(&semaphore_, 0, 0, length >= 0 ? length : INT_MAX);
+    assert(ok);
 }
 
 
@@ -48,30 +47,20 @@ template <typename T>
 T
 Channel<T>::getMessage()
 {
-    while (messages_.empty()) {
-        ::Event_WaitFor(&notEmptyEvent_);
-    }
-
+    ::Semaphore_Down(&semaphore_);
     T message = std::move(messages_.front());
     messages_.pop();
-
-    if (length_ >= 0) {
-        ::Event_Trigger(&notFullEvent_);
-    }
-
     return message;
 }
 
 
 template <typename T>
-T &
+T
 Channel<T>::peekMessage()
 {
-    while (messages_.empty()) {
-        ::Event_WaitFor(&notEmptyEvent_);
-    }
-
-    T &message = messages_.front();
+    ::Semaphore_Down(&semaphore_);
+    T message = messages_.front();
+    ::Semaphore_Up(&semaphore_);
     return message;
 }
 
@@ -81,20 +70,8 @@ template <typename U>
 void
 Channel<T>::putMessage(U &&message)
 {
-    if (length_ == 0) {
-        messages_.push(std::forward<U>(message));
-        ::Event_Trigger(&notEmptyEvent_);
-        ::Event_WaitFor(&notFullEvent_);
-    } else {
-        if (length_ >= 1) {
-            while (messages_.size() == length_) {
-                ::Event_WaitFor(&notFullEvent_);
-            }
-        }
-
-        messages_.push(std::forward<U>(message));
-        ::Event_Trigger(&notEmptyEvent_);
-    }
+    ::Semaphore_Up(&semaphore_);
+    messages_.push(std::forward<U>(message));
 }
 
 
@@ -103,20 +80,8 @@ template <typename... U>
 void
 Channel<T>::newMessage(U &&...arguments)
 {
-    if (length_ == 0) {
-        messages_.emplace(std::forward<U>(arguments)...);
-        ::Event_Trigger(&notEmptyEvent_);
-        ::Event_WaitFor(&notFullEvent_);
-    } else {
-        if (length_ >= 1) {
-            while (messages_.size() == length_) {
-                ::Event_WaitFor(&notFullEvent_);
-            }
-        }
-
-        messages_.emplace(std::forward<U>(arguments)...);
-        ::Event_Trigger(&notEmptyEvent_);
-    }
+    ::Semaphore_Up(&semaphore_);
+    messages_.emplace(std::forward<U>(arguments)...);
 }
 
 } // namespace Gink
