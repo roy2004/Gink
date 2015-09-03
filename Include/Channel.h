@@ -7,6 +7,7 @@
 #include <utility>
 
 #include <Pixy/Semaphore.h>
+#include <Pixy/Event.h>
 
 
 namespace Gink {
@@ -18,10 +19,9 @@ class Channel final
     void operator=(const Channel &) = delete;
 
 public:
-    inline explicit Channel(int);
+    inline explicit Channel(int = 0);
 
     inline T getMessage();
-    inline T peekMessage();
 
     template <typename U>
     inline void putMessage(U &&);
@@ -30,16 +30,25 @@ public:
     inline void newMessage(U &&...);
 
 private:
-    ::Semaphore semaphore_;
+    const bool isUnbuffered_;
     std::queue<T> messages_;
+    ::Semaphore semaphore_;
+    ::Event event_;
 };
 
 
 template <typename T>
 Channel<T>::Channel(int length)
+    : isUnbuffered_(length < 1)
 {
-    bool ok = ::Semaphore_Initialize(&semaphore_, 0, 0, length >= 0 ? length : INT_MAX);
-    assert(ok);
+    if (isUnbuffered_) {
+        bool ok = ::Semaphore_Initialize(&semaphore_, 0, 0, INT_MAX);
+        assert(ok);
+        ::Event_Initialize(&event_);
+    } else {
+        bool ok = ::Semaphore_Initialize(&semaphore_, 0, 0, length);
+        assert(ok);
+    }
 }
 
 
@@ -50,17 +59,11 @@ Channel<T>::getMessage()
     ::Semaphore_Down(&semaphore_);
     T message = std::move(messages_.front());
     messages_.pop();
-    return message;
-}
 
+    if (isUnbuffered_) {
+        ::Event_Trigger(&event_);
+    }
 
-template <typename T>
-T
-Channel<T>::peekMessage()
-{
-    ::Semaphore_Down(&semaphore_);
-    T message = messages_.front();
-    ::Semaphore_Up(&semaphore_);
     return message;
 }
 
@@ -72,6 +75,10 @@ Channel<T>::putMessage(U &&message)
 {
     ::Semaphore_Up(&semaphore_);
     messages_.push(std::forward<U>(message));
+
+    if (isUnbuffered_) {
+        ::Event_WaitFor(&event_);
+    }
 }
 
 
@@ -82,6 +89,10 @@ Channel<T>::newMessage(U &&...arguments)
 {
     ::Semaphore_Up(&semaphore_);
     messages_.emplace(std::forward<U>(arguments)...);
+
+    if (isUnbuffered_) {
+        ::Event_WaitFor(&event_);
+    }
 }
 
 } // namespace Gink
