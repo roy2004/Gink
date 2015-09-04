@@ -8,8 +8,11 @@ namespace Gink {
 GAIError::GAIError(int errorCode, const char *description)
     : errorCode_(errorCode), description_(description)
 {
-    description_ += ": ";
-    description_ += ::gai_strerror(errorCode_);
+    if (errorCode_ != 0) {
+        description_.push_back(':');
+        description_.push_back(' ');
+        description_ += ::gai_strerror(errorCode_);
+    }
 }
 
 } // namespace Gink
