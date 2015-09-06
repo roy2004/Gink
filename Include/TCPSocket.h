@@ -25,7 +25,7 @@ public:
 
     ~TCPSocket();
 
-    TCPSocket accept(IPEndpoint *, int = -1) const;
+    TCPSocket accept(IPEndpoint * = nullptr, int = -1) const;
     std::size_t read(Stream *, int = -1) const;
     std::size_t write(Stream *, int = -1) const;
     void shutdownRead() const;
