@@ -28,7 +28,7 @@ Stream::read(void *buffer, std::size_t bufferSize)
 
     rIndex_ += dataSize;
 
-    if (rIndex_ >= wIndex_ - wIndex_) {
+    if (rIndex_ >= wIndex_ - rIndex_) {
         std::memcpy(base_.data(), base_.data() + rIndex_, wIndex_ - rIndex_);
         wIndex_ -= rIndex_;
         rIndex_ = 0;
@@ -50,6 +50,13 @@ Stream::write(const void *data, std::size_t dataSize)
     }
 
     wIndex_ += dataSize;
+}
+
+
+void
+Stream::growBuffer(std::size_t size)
+{
+    base_.resize(NextPowerOfTwo(base_.size() + size));
 }
 
 

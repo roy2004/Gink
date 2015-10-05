@@ -12,7 +12,7 @@
 
 namespace Gink {
 
-template <typename T>
+template <class T>
 class Channel final
 {
     Channel(const Channel &) = delete;
@@ -23,10 +23,10 @@ public:
 
     inline T getMessage();
 
-    template <typename U>
+    template <class U>
     inline void putMessage(U &&);
 
-    template <typename... U>
+    template <class... U>
     inline void newMessage(U &&...);
 
 private:
@@ -37,7 +37,7 @@ private:
 };
 
 
-template <typename T>
+template <class T>
 Channel<T>::Channel(int length)
     : isUnbuffered_(length < 1)
 {
@@ -52,7 +52,7 @@ Channel<T>::Channel(int length)
 }
 
 
-template <typename T>
+template <class T>
 T
 Channel<T>::getMessage()
 {
@@ -68,8 +68,8 @@ Channel<T>::getMessage()
 }
 
 
-template <typename T>
-template <typename U>
+template <class T>
+template <class U>
 void
 Channel<T>::putMessage(U &&message)
 {
@@ -82,8 +82,8 @@ Channel<T>::putMessage(U &&message)
 }
 
 
-template <typename T>
-template <typename... U>
+template <class T>
+template <class... U>
 void
 Channel<T>::newMessage(U &&...arguments)
 {

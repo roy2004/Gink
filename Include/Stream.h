@@ -13,7 +13,7 @@ class Stream final
     void operator=(const Stream &) = delete;
 
 public:
-    explicit inline Stream();
+    inline explicit Stream();
     inline ~Stream();
 
     inline const void *getData() const;
@@ -24,6 +24,7 @@ public:
 
     std::size_t read(void *, std::size_t);
     void write(const void *, std::size_t);
+    void growBuffer(std::size_t);
     void shrinkToFit();
 
 private:
