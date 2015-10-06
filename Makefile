@@ -1,5 +1,6 @@
 PREFIX = /usr/local/
-OBJECTS = Coroutine.o\
+OBJECTS = Archive.o\
+          Coroutine.o\
           GAIError.o\
           Stream.o\
           SystemError.o\

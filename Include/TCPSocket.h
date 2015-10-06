@@ -34,9 +34,9 @@ public:
     IPEndpoint getRemoteEndpoint() const;
 
 private:
-    explicit TCPSocket(int);
-
     int fd_;
+
+    explicit TCPSocket(int);
 };
 
 
