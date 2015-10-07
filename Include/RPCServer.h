@@ -18,6 +18,8 @@ protected:
     inline RPCServer(const char *, const char *);
     inline virtual ~RPCServer();
 
+    virtual void handleRequest()
+
 private:
     TCPSocket tcpSocket_;
 };

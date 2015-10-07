@@ -12,13 +12,13 @@ namespace Gink {
 
 #define ARCHIVE_INTEGER_SERIALIZER(n)                                          \
     Archive &                                                                  \
-    Archive::operator<<(std::int##n##_t rvalue)                                \
+    Archive::operator<<(std::int##n##_t integer)                               \
     {                                                                          \
         for (;;) {                                                             \
             ::ptrdiff_t result = ::PackInteger##n(                             \
                 static_cast<char *>(stream_->getBuffer()) + writtenByteCount_, \
                 stream_->getBufferSize() - writtenByteCount_,                  \
-                rvalue                                                         \
+                integer                                                        \
             );                                                                 \
                                                                                \
             if (result >= 0) {                                                 \
@@ -34,12 +34,12 @@ namespace Gink {
 
 #define ARCHIVE_INTEGER_DESERIALIZER(n)                                         \
     Archive &                                                                   \
-    Archive::operator>>(std::int##n##_t &lvalue)                                \
+    Archive::operator>>(std::int##n##_t &integer)                               \
     {                                                                           \
         ::ptrdiff_t result = ::UnpackInteger##n(                                \
             static_cast<const char *>(stream_->getData()) + readByteCount_,     \
             stream_->getDataSize() + writtenByteCount_ - readByteCount_,        \
-            &lvalue                                                             \
+            &integer                                                            \
         );                                                                      \
                                                                                 \
         if (result < 0) {                                                       \
@@ -80,14 +80,14 @@ ARCHIVE_INTEGER_DESERIALIZER(64)
 
 
 Archive &
-Archive::operator<<(const std::string &rvalue)
+Archive::operator<<(const std::string &string)
 {
     for (;;) {
         ::ptrdiff_t result = ::PackBytes(
             static_cast<char *>(stream_->getBuffer()) + writtenByteCount_,
             stream_->getBufferSize() - writtenByteCount_,
-            rvalue.data(),
-            rvalue.size()
+            string.data(),
+            string.size()
         );
 
         if (result >= 0) {
@@ -103,7 +103,7 @@ Archive::operator<<(const std::string &rvalue)
 
 
 Archive &
-Archive::operator>>(std::string &lvalue)
+Archive::operator>>(std::string &string)
 {
     const char *bytes;
     size_t numberOfBytes;
@@ -120,19 +120,19 @@ Archive::operator>>(std::string &lvalue)
     }
 
     readByteCount_ += result;
-    lvalue.append(bytes, numberOfBytes);
+    string.append(bytes, numberOfBytes);
     return *this;
 }
 
 
 Archive &
-Archive::operator<<(varint_t rvalue)
+Archive::operator<<(varint_t varint)
 {
     for (;;) {
         ::ptrdiff_t result = ::PackVariableLengthInteger(
             static_cast<char *>(stream_->getBuffer()) + writtenByteCount_,
             stream_->getBufferSize() - writtenByteCount_,
-            static_cast<::intmax_t>(rvalue)
+            static_cast<::intmax_t>(varint)
         );
 
         if (result >= 0) {
@@ -148,12 +148,12 @@ Archive::operator<<(varint_t rvalue)
 
 
 Archive &
-Archive::operator>>(varint_t &lvalue)
+Archive::operator>>(varint_t &varint)
 {
     ::ptrdiff_t result = ::UnpackVariableLengthInteger(
         static_cast<const char *>(stream_->getData()) + readByteCount_,
         stream_->getDataSize() + writtenByteCount_ - readByteCount_,
-        reinterpret_cast<::intmax_t *>(&lvalue)
+        reinterpret_cast<::intmax_t *>(&varint)
     );
 
     if (result < 0) {

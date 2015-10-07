@@ -84,86 +84,86 @@ Archive::Archive(Stream *stream)
 
 
 Archive &
-Archive::operator<<(bool rvalue)
+Archive::operator<<(bool boolean)
 {
-    operator<<(static_cast<::int8_t>(rvalue));
+    operator<<(static_cast<::int8_t>(boolean));
     return *this;
 }
 
 
 Archive &
-Archive::operator>>(bool &lvalue)
+Archive::operator>>(bool &boolean)
 {
     ::int8_t temp;
     operator>>(temp);
-    lvalue = temp;
+    boolean = temp;
     return *this;
 }
 
 
 template<class T>
 typename std::enable_if<std::is_unsigned<T>::value, Archive &>::type
-Archive::operator<<(T rvalue)
+Archive::operator<<(T uInteger)
 {
-    operator<<(static_cast<typename std::make_signed<T>::type>(rvalue));
+    operator<<(static_cast<typename std::make_signed<T>::type>(uInteger));
     return *this;
 }
 
 
 template<class T>
 typename std::enable_if<std::is_unsigned<T>::value, Archive &>::type
-Archive::operator>>(T &lvalue)
+Archive::operator>>(T &uInteger)
 {
-    operator>>(reinterpret_cast<typename std::make_signed<T>::type &>(lvalue));
+    operator>>(reinterpret_cast<typename std::make_signed<T>::type &>(uInteger));
     return *this;
 }
 
 
 template<class T>
 typename std::enable_if<std::is_enum<T>::value, Archive &>::type
-Archive::operator<<(T rvalue)
+Archive::operator<<(T enumerator)
 {
-    operator<<(static_cast<varint_t>(rvalue));
+    operator<<(static_cast<varint_t>(enumerator));
     return *this;
 }
 
 
 template<class T>
 typename std::enable_if<std::is_enum<T>::value, Archive &>::type
-Archive::operator>>(T &lvalue)
+Archive::operator>>(T &enumerator)
 {
     varint_t temp;
     operator>>(temp);
-    lvalue = static_cast<T>(temp);
+    enumerator = static_cast<T>(temp);
     return *this;
 }
 
 
 template<class T>
 typename std::enable_if<std::is_class<T>::value, Archive &>::type
-Archive::operator<<(const T &rvalue)
+Archive::operator<<(const T &structure)
 {
-    rvalue.save(this);
+    structure.save(this);
     return *this;
 }
 
 
 template<class T>
 typename std::enable_if<std::is_class<T>::value, Archive &>::type
-Archive::operator>>(T &lvalue)
+Archive::operator>>(T &structure)
 {
-    lvalue.load(this);
+    structure.load(this);
     return *this;
 }
 
 
 template<class T>
 Archive &
-Archive::operator<<(const std::vector<T> &rvalue)
+Archive::operator<<(const std::vector<T> &vector)
 {
-    operator<<(static_cast<varint_t>(rvalue.size()));
+    operator<<(static_cast<varint_t>(vector.size()));
 
-    for (const T &x: rvalue) {
+    for (const T &x: vector) {
         operator<<(x);
     }
 
@@ -173,15 +173,15 @@ Archive::operator<<(const std::vector<T> &rvalue)
 
 template<class T>
 Archive &
-Archive::operator>>(std::vector<T> &lvalue)
+Archive::operator>>(std::vector<T> &vector)
 {
     varint_t temp;
     operator>>(temp);
     auto n = static_cast<typename std::vector<T>::size_type>(temp);
 
     while (n != 0) {
-        lvalue.emplace_back();
-        operator>>(lvalue.back());
+        vector.emplace_back();
+        operator>>(vector.back());
         --n;
     }
 
