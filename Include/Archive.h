@@ -1,9 +1,10 @@
 #pragma once
 
 
-#include <cstddef>
 #include <cstdint>
+#include <cstddef>
 #include <cassert>
+#include <type_traits>
 #include <vector>
 #include <string>
 
@@ -20,9 +21,16 @@ class Archive final
 
 public:
     inline explicit Archive(Stream *);
-
     inline Archive &operator<<(bool);
     inline Archive &operator>>(bool &);
+    inline Archive &operator<<(const std::string &);
+    inline Archive &operator>>(std::string &);
+
+    template<class T>
+    inline typename std::enable_if<std::is_signed<T>::value, Archive &>::type operator<<(T);
+
+    template<class T>
+    inline typename std::enable_if<std::is_signed<T>::value, Archive &>::type operator>>(T &);
 
     template<class T>
     inline typename std::enable_if<std::is_unsigned<T>::value, Archive &>::type operator<<(T);
@@ -48,31 +56,25 @@ public:
     template<class T>
     inline Archive &operator>>(std::vector<T> &);
 
-    inline std::size_t getWrittenByteCount();
-    inline std::size_t getReadByteCount();
-
-    Archive &operator<<(std::int8_t);
-    Archive &operator>>(std::int8_t &);
-    Archive &operator<<(std::int16_t);
-    Archive &operator>>(std::int16_t &);
-    Archive &operator<<(std::int32_t);
-    Archive &operator>>(std::int32_t &);
-    Archive &operator<<(std::int64_t);
-    Archive &operator>>(std::int64_t &);
-    Archive &operator<<(const std::string &);
-    Archive &operator>>(std::string &);
-
     void flush();
 
 private:
-    typedef enum: std::intmax_t {} varint_t;
-
     Stream *const stream_;
     std::size_t writtenByteCount_;
     std::size_t readByteCount_;
 
-    Archive &operator<<(varint_t);
-    Archive &operator>>(varint_t &);
+    void serializeInteger(std::int8_t);
+    void deserializeInteger(std::int8_t *);
+    void serializeInteger(std::int16_t);
+    void deserializeInteger(std::int16_t *);
+    void serializeInteger(std::int32_t);
+    void deserializeInteger(std::int32_t *);
+    void serializeInteger(std::int64_t);
+    void deserializeInteger(std::int64_t *);
+    void serializeVariableLengthInteger(std::intmax_t);
+    void deserializeVariableLengthInteger(std::intmax_t *);
+    void serializeBytes(const char *, std::size_t);
+    void deserializeBytes(const char **, std::size_t *);
 };
 
 
@@ -86,7 +88,7 @@ Archive::Archive(Stream *stream)
 Archive &
 Archive::operator<<(bool boolean)
 {
-    operator<<(static_cast<::int8_t>(boolean));
+    serializeInteger(static_cast<std::int8_t>(boolean));
     return *this;
 }
 
@@ -94,9 +96,46 @@ Archive::operator<<(bool boolean)
 Archive &
 Archive::operator>>(bool &boolean)
 {
-    ::int8_t temp;
-    operator>>(temp);
+    std::int8_t temp;
+    deserializeInteger(&temp);
     boolean = temp;
+    return *this;
+}
+
+
+Archive &
+Archive::operator<<(const std::string &string)
+{
+    serializeBytes(string.data(), string.size());
+    return *this;
+}
+
+
+Archive &
+Archive::operator>>(std::string &string)
+{
+    const char *bytes;
+    size_t numberOfBytes;
+    deserializeBytes(&bytes, &numberOfBytes);
+    string.append(bytes, numberOfBytes);
+    return *this;
+}
+
+
+template<class T>
+typename std::enable_if<std::is_signed<T>::value, Archive &>::type
+Archive::operator<<(T integer)
+{
+    serializeInteger(integer);
+    return *this;
+}
+
+
+template<class T>
+typename std::enable_if<std::is_signed<T>::value, Archive &>::type
+Archive::operator>>(T &integer)
+{
+    deserializeInteger(&integer);
     return *this;
 }
 
@@ -105,7 +144,7 @@ template<class T>
 typename std::enable_if<std::is_unsigned<T>::value, Archive &>::type
 Archive::operator<<(T uInteger)
 {
-    operator<<(static_cast<typename std::make_signed<T>::type>(uInteger));
+    serializeInteger(static_cast<typename std::make_signed<T>::type>(uInteger));
     return *this;
 }
 
@@ -114,7 +153,9 @@ template<class T>
 typename std::enable_if<std::is_unsigned<T>::value, Archive &>::type
 Archive::operator>>(T &uInteger)
 {
-    operator>>(reinterpret_cast<typename std::make_signed<T>::type &>(uInteger));
+    typename std::make_signed<T>::type temp;
+    deserializeInteger(&temp);
+    uInteger = temp;
     return *this;
 }
 
@@ -123,17 +164,17 @@ template<class T>
 typename std::enable_if<std::is_enum<T>::value, Archive &>::type
 Archive::operator<<(T enumerator)
 {
-    operator<<(static_cast<varint_t>(enumerator));
+    serializeVariableLengthInteger(static_cast<std::intmax_t>(enumerator));
     return *this;
 }
 
 
 template<class T>
-typename std::enable_if<std::is_enum<T>::value, Archive &>::type
+inline typename std::enable_if<std::is_enum<T>::value, Archive &>::type
 Archive::operator>>(T &enumerator)
 {
-    varint_t temp;
-    operator>>(temp);
+    std::intmax_t temp;
+    deserializeVariableLengthInteger(&temp);
     enumerator = static_cast<T>(temp);
     return *this;
 }
@@ -141,18 +182,18 @@ Archive::operator>>(T &enumerator)
 
 template<class T>
 typename std::enable_if<std::is_class<T>::value, Archive &>::type
-Archive::operator<<(const T &structure)
+Archive::operator<<(const T &object)
 {
-    structure.save(this);
+    object.store();
     return *this;
 }
 
 
 template<class T>
 typename std::enable_if<std::is_class<T>::value, Archive &>::type
-Archive::operator>>(T &structure)
+Archive::operator>>(T &object)
 {
-    structure.load(this);
+    object.load();
     return *this;
 }
 
@@ -161,7 +202,7 @@ template<class T>
 Archive &
 Archive::operator<<(const std::vector<T> &vector)
 {
-    operator<<(static_cast<varint_t>(vector.size()));
+    serializeVariableLengthInteger(vector.size());
 
     for (const T &x: vector) {
         operator<<(x);
@@ -175,8 +216,8 @@ template<class T>
 Archive &
 Archive::operator>>(std::vector<T> &vector)
 {
-    varint_t temp;
-    operator>>(temp);
+    std::intmax_t temp;
+    deserializeVariableLengthInteger(&temp);
     auto n = static_cast<typename std::vector<T>::size_type>(temp);
 
     while (n != 0) {
@@ -186,20 +227,6 @@ Archive::operator>>(std::vector<T> &vector)
     }
 
     return *this;
-}
-
-
-std::size_t
-Archive::getWrittenByteCount()
-{
-    return writtenByteCount_;
-}
-
-
-std::size_t
-Archive::getReadByteCount()
-{
-    return readByteCount_;
 }
 
 } // namespace Gink
