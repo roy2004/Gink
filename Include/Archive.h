@@ -170,7 +170,7 @@ Archive::operator<<(T enumerator)
 
 
 template<class T>
-inline typename std::enable_if<std::is_enum<T>::value, Archive &>::type
+typename std::enable_if<std::is_enum<T>::value, Archive &>::type
 Archive::operator>>(T &enumerator)
 {
     std::intmax_t temp;
