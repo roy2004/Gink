@@ -1,6 +1,5 @@
 #include "Archive.h"
 
-#include <climits>
 #include <cerrno>
 #include <cstring>
 
