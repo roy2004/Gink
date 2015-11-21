@@ -10,48 +10,47 @@
 
 namespace Gink {
 
-
-#define INTEGER_SERIALIZER(n)                                                        \
-    void                                                                             \
-    Archive::serializeInteger(std::int##n##_t integer)                               \
-    {                                                                                \
-        std::size_t bufferSize = stream_->getBufferSize() - writtenByteCount_;       \
-                                                                                     \
-        if (bufferSize < sizeof integer) {                                           \
-            stream_->growBuffer(sizeof integer - bufferSize);                        \
-        }                                                                            \
-                                                                                     \
-        auto buffer = static_cast<char *>(stream_->getBuffer()) + writtenByteCount_; \
-        buffer[sizeof integer - 1] = integer;                                        \
-        std::ptrdiff_t i;                                                            \
-                                                                                     \
-        for (i = sizeof integer - 2; i >= 0; --i) {                                  \
-            integer = static_cast<std::uint##n##_t>(integer) >> CHAR_BIT;            \
-            buffer[i] = integer;                                                     \
-        }                                                                            \
-                                                                                     \
-        writtenByteCount_ += sizeof integer;                                         \
+#define INTEGER_SERIALIZER(n)                                                                 \
+    void                                                                                      \
+    Archive::serializeInteger(std::uint##n##_t integer)                                       \
+    {                                                                                         \
+        std::size_t bufferSize = stream_->getBufferSize() - writtenByteCount_;                \
+                                                                                              \
+        if (bufferSize < sizeof integer) {                                                    \
+            stream_->growBuffer(sizeof integer - bufferSize);                                 \
+        }                                                                                     \
+                                                                                              \
+        auto buffer = static_cast<unsigned char *>(stream_->getBuffer()) + writtenByteCount_; \
+        buffer[sizeof integer - 1] = integer;                                                 \
+        std::ptrdiff_t i;                                                                     \
+                                                                                              \
+        for (i = sizeof integer - 2; i >= 0; --i) {                                           \
+            integer >>= std::numeric_limits<unsigned char>::digits;                           \
+            buffer[i] = integer;                                                              \
+        }                                                                                     \
+                                                                                              \
+        writtenByteCount_ += sizeof integer;                                                  \
     }
 
-#define INTEGER_DESERIALIZER(n)                                                     \
-    void                                                                            \
-    Archive::deserializeInteger(std::int##n##_t *integer)                           \
-    {                                                                               \
-        std::size_t dataSize = stream_->getDataSize() - readByteCount_;             \
-                                                                                    \
-        if (dataSize < sizeof *integer) {                                           \
-            throw GINK_SYSTEM_ERROR(ENODATA, "deserialize failed");                 \
-        }                                                                           \
-                                                                                    \
-        auto data = static_cast<const char *>(stream_->getData()) + readByteCount_; \
-        *integer = static_cast<unsigned char>(data[0]);                             \
-        std::ptrdiff_t i;                                                           \
-                                                                                    \
-        for (i = 1; i < static_cast<std::ptrdiff_t>(sizeof *integer); ++i) {        \
-            *integer = *integer << CHAR_BIT | static_cast<unsigned char>(data[i]);  \
-        }                                                                           \
-                                                                                    \
-        readByteCount_ += sizeof *integer;                                          \
+#define INTEGER_DESERIALIZER(n)                                                              \
+    void                                                                                     \
+    Archive::deserializeInteger(std::uint##n##_t *integer)                                   \
+    {                                                                                        \
+        std::size_t dataSize = stream_->getDataSize() + writtenByteCount_ - readByteCount_;  \
+                                                                                             \
+        if (dataSize < sizeof *integer) {                                                    \
+            throw GINK_SYSTEM_ERROR(ENODATA, "deserialize failed");                          \
+        }                                                                                    \
+                                                                                             \
+        auto data = static_cast<const unsigned char *>(stream_->getData()) + readByteCount_; \
+        *integer = data[0];                                                                  \
+        std::ptrdiff_t i;                                                                    \
+                                                                                             \
+        for (i = 1; i < static_cast<std::ptrdiff_t>(sizeof *integer); ++i) {                 \
+            *integer = *integer << std::numeric_limits<unsigned char>::digits | data[i];     \
+        }                                                                                    \
+                                                                                             \
+        readByteCount_ += sizeof *integer;                                                   \
     }
 
 
@@ -84,70 +83,69 @@ INTEGER_DESERIALIZER(64)
 
 
 void
-Archive::serializeVariableLengthInteger(std::intmax_t integer)
+Archive::serializeVariableLengthInteger(std::uintmax_t integer)
 {
-    std::intmax_t integerSign = integer >> (sizeof integer * CHAR_BIT - 1);
+    std::uintmax_t temp = (integer ^ integer << 1) >> 1;
 
-    if (integer >> 6 == integerSign) {
-        serializeInteger(static_cast<std::int8_t>(integer & UINTMAX_C(0x7F)));
+    if (temp >> 6 == 0) {
+        serializeInteger(static_cast<std::uint8_t>(integer | 0x80));
         return;
     }
 
-    if (integer >> 13 == integerSign) {
-        serializeInteger(static_cast<std::int16_t>((integer | UINTMAX_C(0x8000))
-                                                   & UINTMAX_C(0xBFFF)));
+    if (temp >> 13 == 0) {
+        serializeInteger(static_cast<std::uint16_t>((integer & 0x7FFF) | 0x4000));
         return;
     }
 
-    if (integer >> 28 == integerSign) {
-        serializeInteger(static_cast<std::int32_t>((integer | UINTMAX_C(0xC0000000))
-                                                   & UINTMAX_C(0xDFFFFFFF)));
+    if (temp >> 28 == 0) {
+        serializeInteger(static_cast<std::uint32_t>((integer & 0x3FFFFFFF) | 0x20000000));
         return;
     }
 
-    if (integer >> 59 == integerSign) {
-        serializeInteger(static_cast<std::int64_t>((integer | UINTMAX_C(0xE000000000000000))
-                                                   & UINTMAX_C(0xEFFFFFFFFFFFFFFF)));
+    if (temp >> 59 == 0) {
+        serializeInteger(static_cast<std::uint64_t>((integer & 0x1FFFFFFFFFFFFFFF)
+                                                    | 0x1000000000000000));
         return;
     }
 
-    serializeInteger(static_cast<std::int8_t>(UINT8_MAX));
+    serializeInteger(static_cast<std::uint8_t>(-1));
     serializeInteger(integer);
 }
 
 
 void
-Archive::deserializeVariableLengthInteger(std::intmax_t *integer)
+Archive::deserializeVariableLengthInteger(std::uintmax_t *integer)
 {
-    std::int8_t integerHead;
+    std::uint8_t integerHead;
     deserializeInteger(&integerHead);
 
-    if ((integerHead & 1 << 7) == 0) {
-        *integer = static_cast<std::int8_t>(static_cast<std::uint8_t>(integerHead) << 1) >> 1;
+    if ((integerHead & 0x80) != 0) {
+        std::uint8_t temp = integerHead;
+        *integer = (temp & ~0x80) | -(temp & 0x40);
         return;
     }
 
-    if ((integerHead & 1 << 6) == 0) {
+    if ((integerHead & 0x40) != 0) {
         readByteCount_ -= sizeof integerHead;
-        std::int16_t temp;
+        std::uint16_t temp;
         deserializeInteger(&temp);
-        *integer = static_cast<std::int16_t>(static_cast<std::uint16_t>(temp) << 2) >> 2;
+        *integer = (temp & ~0x4000) | -(temp & 0x2000);
         return;
     }
 
-    if ((integerHead & 1 << 5) == 0) {
+    if ((integerHead & 0x20) != 0) {
         readByteCount_ -= sizeof integerHead;
-        std::int32_t temp;
+        std::uint32_t temp;
         deserializeInteger(&temp);
-        *integer = static_cast<std::int32_t>(static_cast<std::uint32_t>(temp) << 3) >> 3;
+        *integer = (temp & ~0x20000000) | -(temp & 0x10000000);
         return;
     }
 
-    if ((integerHead & 1 << 4) == 0) {
+    if ((integerHead & 0x10) != 0) {
         readByteCount_ -= sizeof integerHead;
-        std::int64_t temp;
+        std::uint64_t temp;
         deserializeInteger(&temp);
-        *integer = static_cast<std::int64_t>(static_cast<std::uint64_t>(temp) << 4) >> 4;
+        *integer = (temp & ~0x1000000000000000) | -(temp & 0x0800000000000000);
         return;
     }
 
@@ -174,10 +172,10 @@ Archive::serializeBytes(const char *bytes, std::size_t numberOfBytes)
 void
 Archive::deserializeBytes(const char **bytes, std::size_t *numberOfBytes)
 {
-    std::intmax_t temp;
+    std::uintmax_t temp;
     deserializeVariableLengthInteger(&temp);
     *numberOfBytes = temp;
-    std::size_t dataSize = stream_->getDataSize() - readByteCount_;
+    std::size_t dataSize = stream_->getDataSize() + writtenByteCount_ - readByteCount_;
 
     if (dataSize < *numberOfBytes) {
         throw GINK_SYSTEM_ERROR(ENODATA, "deserialize failed");

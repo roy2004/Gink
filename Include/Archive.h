@@ -7,6 +7,7 @@
 #include <type_traits>
 #include <vector>
 #include <string>
+#include <limits>
 
 
 namespace Gink {
@@ -27,16 +28,16 @@ public:
     inline Archive &operator>>(std::string &);
 
     template<class T>
-    inline typename std::enable_if<std::is_signed<T>::value, Archive &>::type operator<<(T);
-
-    template<class T>
-    inline typename std::enable_if<std::is_signed<T>::value, Archive &>::type operator>>(T &);
-
-    template<class T>
     inline typename std::enable_if<std::is_unsigned<T>::value, Archive &>::type operator<<(T);
 
     template<class T>
     inline typename std::enable_if<std::is_unsigned<T>::value, Archive &>::type operator>>(T &);
+
+    template<class T>
+    inline typename std::enable_if<std::is_signed<T>::value, Archive &>::type operator<<(T);
+
+    template<class T>
+    inline typename std::enable_if<std::is_signed<T>::value, Archive &>::type operator>>(T &);
 
     template<class T>
     inline typename std::enable_if<std::is_enum<T>::value, Archive &>::type operator<<(T);
@@ -49,6 +50,12 @@ public:
 
     template<class T>
     inline typename std::enable_if<std::is_class<T>::value, Archive &>::type operator>>(T &);
+
+    template<class T, std::size_t N>
+    inline Archive &operator<<(const T (&)[N]);
+
+    template<class T, std::size_t N>
+    inline Archive &operator>>(T (&)[N]);
 
     template<class T>
     inline Archive &operator<<(const std::vector<T> &);
@@ -63,16 +70,16 @@ private:
     std::size_t writtenByteCount_;
     std::size_t readByteCount_;
 
-    void serializeInteger(std::int8_t);
-    void deserializeInteger(std::int8_t *);
-    void serializeInteger(std::int16_t);
-    void deserializeInteger(std::int16_t *);
-    void serializeInteger(std::int32_t);
-    void deserializeInteger(std::int32_t *);
-    void serializeInteger(std::int64_t);
-    void deserializeInteger(std::int64_t *);
-    void serializeVariableLengthInteger(std::intmax_t);
-    void deserializeVariableLengthInteger(std::intmax_t *);
+    void serializeInteger(std::uint8_t);
+    void deserializeInteger(std::uint8_t *);
+    void serializeInteger(std::uint16_t);
+    void deserializeInteger(std::uint16_t *);
+    void serializeInteger(std::uint32_t);
+    void deserializeInteger(std::uint32_t *);
+    void serializeInteger(std::uint64_t);
+    void deserializeInteger(std::uint64_t *);
+    void serializeVariableLengthInteger(std::uintmax_t);
+    void deserializeVariableLengthInteger(std::uintmax_t *);
     void serializeBytes(const char *, std::size_t);
     void deserializeBytes(const char **, std::size_t *);
 };
@@ -88,7 +95,7 @@ Archive::Archive(Stream *stream)
 Archive &
 Archive::operator<<(bool boolean)
 {
-    serializeInteger(static_cast<std::int8_t>(boolean));
+    serializeInteger(static_cast<std::uint8_t>(boolean));
     return *this;
 }
 
@@ -96,7 +103,7 @@ Archive::operator<<(bool boolean)
 Archive &
 Archive::operator>>(bool &boolean)
 {
-    std::int8_t temp;
+    std::uint8_t temp;
     deserializeInteger(&temp);
     boolean = temp;
     return *this;
@@ -123,7 +130,7 @@ Archive::operator>>(std::string &string)
 
 
 template<class T>
-typename std::enable_if<std::is_signed<T>::value, Archive &>::type
+typename std::enable_if<std::is_unsigned<T>::value, Archive &>::type
 Archive::operator<<(T integer)
 {
     serializeInteger(integer);
@@ -132,7 +139,7 @@ Archive::operator<<(T integer)
 
 
 template<class T>
-typename std::enable_if<std::is_signed<T>::value, Archive &>::type
+typename std::enable_if<std::is_unsigned<T>::value, Archive &>::type
 Archive::operator>>(T &integer)
 {
     deserializeInteger(&integer);
@@ -141,21 +148,22 @@ Archive::operator>>(T &integer)
 
 
 template<class T>
-typename std::enable_if<std::is_unsigned<T>::value, Archive &>::type
-Archive::operator<<(T uInteger)
+typename std::enable_if<std::is_signed<T>::value, Archive &>::type
+Archive::operator<<(T integer)
 {
-    serializeInteger(static_cast<typename std::make_signed<T>::type>(uInteger));
+    serializeInteger(static_cast<typename std::make_unsigned<T>::type>(integer));
     return *this;
 }
 
 
 template<class T>
-typename std::enable_if<std::is_unsigned<T>::value, Archive &>::type
-Archive::operator>>(T &uInteger)
+typename std::enable_if<std::is_signed<T>::value, Archive &>::type
+Archive::operator>>(T &integer)
 {
-    typename std::make_signed<T>::type temp;
+    typename std::make_unsigned<T>::type temp;
     deserializeInteger(&temp);
-    uInteger = temp;
+    integer = temp <= std::numeric_limits<T>::max() ? static_cast<T>(temp)
+                                                      : -static_cast<T>(-temp - 1) - 1;
     return *this;
 }
 
@@ -164,7 +172,7 @@ template<class T>
 typename std::enable_if<std::is_enum<T>::value, Archive &>::type
 Archive::operator<<(T enumerator)
 {
-    serializeVariableLengthInteger(static_cast<std::intmax_t>(enumerator));
+    operator<<(static_cast<typename std::underlying_type<T>::type>(enumerator));
     return *this;
 }
 
@@ -173,8 +181,8 @@ template<class T>
 typename std::enable_if<std::is_enum<T>::value, Archive &>::type
 Archive::operator>>(T &enumerator)
 {
-    std::intmax_t temp;
-    deserializeVariableLengthInteger(&temp);
+    typename std::underlying_type<T>::type temp;
+    operator>>(temp);
     enumerator = static_cast<T>(temp);
     return *this;
 }
@@ -184,7 +192,7 @@ template<class T>
 typename std::enable_if<std::is_class<T>::value, Archive &>::type
 Archive::operator<<(const T &object)
 {
-    object.store();
+    object.store(this);
     return *this;
 }
 
@@ -193,7 +201,35 @@ template<class T>
 typename std::enable_if<std::is_class<T>::value, Archive &>::type
 Archive::operator>>(T &object)
 {
-    object.load();
+    object.load(this);
+    return *this;
+}
+
+
+template<class T, std::size_t N>
+Archive &
+Archive::operator<<(const T (&array)[N])
+{
+    std::ptrdiff_t i;
+
+    for (i = 0; i < static_cast<std::ptrdiff_t>(N); ++i) {
+        operator<<(array[i]);
+    }
+
+    return *this;
+}
+
+
+template<class T, std::size_t N>
+Archive &
+Archive::operator>>(T (&array)[N])
+{
+    std::ptrdiff_t i;
+
+    for (i = 0; i < static_cast<std::ptrdiff_t>(N); ++i) {
+        operator>>(array[i]);
+    }
+
     return *this;
 }
 
@@ -216,11 +252,11 @@ template<class T>
 Archive &
 Archive::operator>>(std::vector<T> &vector)
 {
-    std::intmax_t temp;
+    std::uintmax_t temp;
     deserializeVariableLengthInteger(&temp);
     auto n = static_cast<typename std::vector<T>::size_type>(temp);
 
-    while (n != 0) {
+    while (n >= 1) {
         vector.emplace_back();
         operator>>(vector.back());
         --n;
